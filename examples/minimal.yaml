@@ -1,0 +1,10 @@
+# Minimal context example
+# The simplest possible ctx configuration
+
+name: myproject-dev
+description: "Development environment"
+environment: development
+
+aws:
+  profile: myproject-dev
+  region: us-west-2

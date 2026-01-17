@@ -1,0 +1,88 @@
+# SPDX-FileCopyrightText: 2026 Vedran Lebo <vedran@flyingpenguin.tech>
+# SPDX-License-Identifier: MIT
+
+site_name: ctx_
+site_description: Multi-environment context manager - manage cloud profiles, Kubernetes clusters, VPN, and SSH tunnels
+site_url: https://vlebo.github.io/ctx
+repo_url: https://github.com/vlebo/ctx
+repo_name: vlebo/ctx
+
+theme:
+  name: material
+  logo: assets/logo.svg
+  favicon: assets/logo.svg
+  palette:
+    - scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+  icon:
+    repo: fontawesome/brands/github
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Configuration:
+      - Overview: configuration/overview.md
+      - Context Inheritance: configuration/inheritance.md
+      - Reference: configuration/reference.md
+  - Cloud Providers:
+      - AWS: cloud/aws.md
+      - GCP: cloud/gcp.md
+      - Azure: cloud/azure.md
+  - Secrets:
+      - Overview: secrets/index.md
+      - Bitwarden: secrets/bitwarden.md
+      - 1Password: secrets/onepassword.md
+      - HashiCorp Vault: secrets/vault.md
+      - Cloud Secrets: secrets/cloud.md
+  - Features:
+      - VPN: features/vpn.md
+      - SSH Tunnels: features/tunnels.md
+      - Browser Profiles: features/browser.md
+      - Proxy: features/proxy.md
+  - CLI Reference: commands.md
+  - Environment Variables: environment.md
+  - Guides:
+      - Tips & Best Practices: guides/tips.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - attr_list
+  - md_in_html
+
+plugins:
+  - search
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/vlebo/ctx

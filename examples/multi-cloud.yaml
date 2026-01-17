@@ -1,0 +1,25 @@
+# Multi-cloud context example
+# Configure AWS, GCP, and Azure in a single context
+
+name: hybrid-prod
+description: "Hybrid Cloud Production"
+environment: production
+
+aws:
+  profile: hybrid-aws-prod
+  region: us-east-1
+  sso_login: true
+
+gcp:
+  project: hybrid-gcp-prod-123456
+  region: us-central1
+  auto_login: true
+
+azure:
+  subscription_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  tenant_id: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  auto_login: true
+
+kubernetes:
+  context: gke_hybrid-gcp-prod_us-central1_main-cluster
+  namespace: production

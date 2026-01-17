@@ -1,0 +1,52 @@
+version = 1
+SPDX-PackageName = "ctx"
+SPDX-PackageSupplier = "Vedran Lebo <vedran@flyingpenguin.tech>"
+SPDX-PackageDownloadLocation = "https://github.com/vlebo/ctx"
+
+[[annotations]]
+path = ["go.mod", "go.sum"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Vedran Lebo <vedran@flyingpenguin.tech>"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ".gitignore"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Vedran Lebo <vedran@flyingpenguin.tech>"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "LICENSE"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Vedran Lebo <vedran@flyingpenguin.tech>"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "LICENSES/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Vedran Lebo <vedran@flyingpenguin.tech>"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ["README.md", "CONTRIBUTING.md"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Vedran Lebo <vedran@flyingpenguin.tech>"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "docs/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Vedran Lebo <vedran@flyingpenguin.tech>"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "site/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Vedran Lebo <vedran@flyingpenguin.tech>"
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = "examples/**"
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Vedran Lebo <vedran@flyingpenguin.tech>"
+SPDX-License-Identifier = "MIT"
