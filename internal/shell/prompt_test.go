@@ -100,7 +100,7 @@ func TestGetCurrentContextName(t *testing.T) {
 
 	// Create name file
 	namePath := filepath.Join(tmpDir, "current.name")
-	if err := os.WriteFile(namePath, []byte("test-context"), 0644); err != nil {
+	if err := os.WriteFile(namePath, []byte("test-context"), 0o644); err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
 

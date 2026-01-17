@@ -45,18 +45,19 @@ func (s TunnelStatus) String() string {
 
 // Tunnel represents an SSH tunnel with local port forwarding.
 type Tunnel struct {
-	config      types.TunnelConfig
-	conn        *Connection
-	listener    net.Listener
-	status      TunnelStatus
-	lastError   error
-	activeConns int64
-	startedAt   time.Time
+	startedAt time.Time
 
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	mu     sync.RWMutex
+	listener  net.Listener
+	lastError error
+
+	ctx         context.Context
+	conn        *Connection
+	cancel      context.CancelFunc
+	config      types.TunnelConfig
+	wg          sync.WaitGroup
+	status      TunnelStatus
+	activeConns int64
+	mu          sync.RWMutex
 }
 
 // NewTunnel creates a new tunnel instance.
@@ -235,14 +236,14 @@ func (t *Tunnel) handleConnection(local net.Conn) {
 
 // TunnelInfo provides information about a tunnel for display.
 type TunnelInfo struct {
+	StartedAt         time.Time
+	LastError         error
 	Name              string
 	Description       string
 	LocalAddr         string
 	RemoteAddr        string
 	Status            TunnelStatus
 	ActiveConnections int64
-	StartedAt         time.Time
-	LastError         error
 }
 
 // Info returns information about the tunnel.

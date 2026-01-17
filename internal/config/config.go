@@ -7,8 +7,10 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -40,10 +42,10 @@ const (
 
 // Manager handles configuration operations.
 type Manager struct {
+	appConfig   *types.AppConfig
 	configDir   string
 	contextsDir string
 	stateDir    string
-	appConfig   *types.AppConfig
 }
 
 // NewManager creates a new configuration manager.
@@ -91,7 +93,7 @@ func (m *Manager) StateDir() string {
 func (m *Manager) EnsureDirs() error {
 	dirs := []string{m.configDir, m.contextsDir, m.stateDir}
 	for _, dir := range dirs {
-		if err := os.MkdirAll(dir, 0755); err != nil {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}
@@ -149,7 +151,7 @@ func (m *Manager) SaveAppConfig(config *types.AppConfig) error {
 		return fmt.Errorf("failed to marshal config: %w", err)
 	}
 
-	if err := os.WriteFile(configPath, data, 0644); err != nil {
+	if err := os.WriteFile(configPath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
@@ -186,10 +188,8 @@ func (m *Manager) LoadContext(name string) (*types.ContextConfig, error) {
 // loadContextWithChain loads a context and tracks the inheritance chain to detect cycles.
 func (m *Manager) loadContextWithChain(name string, chain []string) (*types.ContextConfig, error) {
 	// Check for circular dependency
-	for _, ancestor := range chain {
-		if ancestor == name {
-			return nil, fmt.Errorf("circular inheritance detected: %s -> %s", strings.Join(append(chain, name), " -> "), name)
-		}
+	if slices.Contains(chain, name) {
+		return nil, fmt.Errorf("circular inheritance detected: %s -> %s", strings.Join(append(chain, name), " -> "), name)
 	}
 
 	contextPath := filepath.Join(m.contextsDir, name+".yaml")
@@ -231,7 +231,7 @@ func (m *Manager) SaveContext(config *types.ContextConfig) error {
 		return fmt.Errorf("failed to marshal context: %w", err)
 	}
 
-	if err := os.WriteFile(contextPath, data, 0644); err != nil {
+	if err := os.WriteFile(contextPath, data, 0o644); err != nil {
 		return fmt.Errorf("failed to write context file: %w", err)
 	}
 
@@ -326,7 +326,7 @@ func (m *Manager) SetCurrentContext(name string) error {
 	}
 
 	namePath := filepath.Join(m.stateDir, CurrentNameFile)
-	if err := os.WriteFile(namePath, []byte(name), 0644); err != nil {
+	if err := os.WriteFile(namePath, []byte(name), 0o644); err != nil {
 		return fmt.Errorf("failed to write current context: %w", err)
 	}
 
@@ -362,16 +362,14 @@ func (m *Manager) WriteEnvFileWithSecrets(ctx *types.ContextConfig, secrets map[
 	envVars := m.GenerateEnvVars(ctx)
 
 	// Merge secrets (secrets take precedence)
-	for key, value := range secrets {
-		envVars[key] = value
-	}
+	maps.Copy(envVars, secrets)
 
-	var content string
+	var content strings.Builder
 	for key, value := range envVars {
-		content += fmt.Sprintf("export %s=%q\n", key, value)
+		content.WriteString(fmt.Sprintf("export %s=%q\n", key, value))
 	}
 
-	if err := os.WriteFile(envPath, []byte(content), 0644); err != nil {
+	if err := os.WriteFile(envPath, []byte(content.String()), 0o644); err != nil {
 		return fmt.Errorf("failed to write env file: %w", err)
 	}
 
@@ -534,9 +532,7 @@ func (m *Manager) GenerateEnvVars(ctx *types.ContextConfig) map[string]string {
 	}
 
 	// Custom environment variables
-	for key, value := range ctx.Env {
-		envVars[key] = value
-	}
+	maps.Copy(envVars, ctx.Env)
 
 	// Context metadata
 	envVars["CTX_CURRENT"] = ctx.Name
@@ -577,7 +573,7 @@ func (m *Manager) TokensDir() string {
 
 // EnsureTokensDir creates the tokens directory if it doesn't exist.
 func (m *Manager) EnsureTokensDir() error {
-	return os.MkdirAll(m.TokensDir(), 0700) // Restrictive permissions for tokens
+	return os.MkdirAll(m.TokensDir(), 0o700) // Restrictive permissions for tokens
 }
 
 // vaultTokenKey returns the keyring key for a context's Vault token.
@@ -606,7 +602,7 @@ func (m *Manager) SaveVaultToken(contextName, token string) error {
 
 	tokenPath := filepath.Join(m.TokensDir(), contextName+".vault")
 	// Use restrictive permissions - tokens are sensitive
-	if err := os.WriteFile(tokenPath, []byte(token), 0600); err != nil {
+	if err := os.WriteFile(tokenPath, []byte(token), 0o600); err != nil {
 		return fmt.Errorf("failed to save vault token: %w", err)
 	}
 
@@ -676,7 +672,7 @@ func (m *Manager) SaveBitwardenSession(contextName, session string) error {
 
 	sessionPath := filepath.Join(m.TokensDir(), contextName+".bitwarden")
 	// Use restrictive permissions - sessions are sensitive
-	if err := os.WriteFile(sessionPath, []byte(session), 0600); err != nil {
+	if err := os.WriteFile(sessionPath, []byte(session), 0o600); err != nil {
 		return fmt.Errorf("failed to save bitwarden session: %w", err)
 	}
 
@@ -743,7 +739,7 @@ func (m *Manager) SaveOnePasswordSession(contextName, session string) error {
 	}
 
 	sessionPath := filepath.Join(m.TokensDir(), contextName+".onepassword")
-	if err := os.WriteFile(sessionPath, []byte(session), 0600); err != nil {
+	if err := os.WriteFile(sessionPath, []byte(session), 0o600); err != nil {
 		return fmt.Errorf("failed to save 1password session: %w", err)
 	}
 
@@ -796,7 +792,7 @@ func (m *Manager) AzureConfigDir(contextName string) string {
 
 // EnsureAzureConfigDir creates the Azure config directory for a context if it doesn't exist.
 func (m *Manager) EnsureAzureConfigDir(contextName string) error {
-	return os.MkdirAll(m.AzureConfigDir(contextName), 0700)
+	return os.MkdirAll(m.AzureConfigDir(contextName), 0o700)
 }
 
 // GCPConfigDir returns the GCP config directory for a specific context.
@@ -806,17 +802,17 @@ func (m *Manager) GCPConfigDir(contextName string) string {
 
 // EnsureGCPConfigDir creates the GCP config directory for a context if it doesn't exist.
 func (m *Manager) EnsureGCPConfigDir(contextName string) error {
-	return os.MkdirAll(m.GCPConfigDir(contextName), 0700)
+	return os.MkdirAll(m.GCPConfigDir(contextName), 0o700)
 }
 
 // AWSCredentials holds temporary AWS credentials from aws-vault.
 // The JSON field names match aws-vault's exec --json output format.
 type AWSCredentials struct {
-	Version         int    `json:"Version"`
 	AccessKeyID     string `json:"AccessKeyId"`
 	SecretAccessKey string `json:"SecretAccessKey"`
 	SessionToken    string `json:"SessionToken"`
 	Expiration      string `json:"Expiration"` // RFC3339 format
+	Version         int    `json:"Version"`
 }
 
 // SaveAWSCredentials saves temporary AWS credentials for a context.
@@ -831,7 +827,7 @@ func (m *Manager) SaveAWSCredentials(contextName string, creds *AWSCredentials) 
 	}
 
 	credPath := filepath.Join(m.TokensDir(), contextName+".aws")
-	if err := os.WriteFile(credPath, data, 0600); err != nil {
+	if err := os.WriteFile(credPath, data, 0o600); err != nil {
 		return fmt.Errorf("failed to save AWS credentials: %w", err)
 	}
 	return nil
