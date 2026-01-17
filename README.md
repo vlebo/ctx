@@ -11,13 +11,20 @@
 
 `ctx` is a CLI tool that simplifies working across multiple cloud environments, projects, and infrastructure platforms. Switch between AWS profiles, Kubernetes clusters, VPN connections, and SSH tunnels with a single command.
 
-```bash
-# Switch to production environment
-ctx use acme-prod
+```
+$ ctx list
+NAME           ENVIRONMENT  CLOUD  ORCHESTRATION
+acme-dev       development  aws    kubernetes
+acme-staging   staging      aws    kubernetes
+acme-prod      production   aws    kubernetes
 
-# Everything is configured: AWS, Kubernetes, VPN, tunnels
-kubectl get pods     # Connected to prod cluster
-aws s3 ls            # Using acme-prod AWS profile
+$ ctx use acme-prod
+✓ AWS profile: acme-prod (us-east-1)
+✓ Kubernetes: prod-cluster/default
+✓ VPN connected: wireguard (wg0)
+✓ Tunnels: postgres, redis
+
+[ctx: acme-prod] $
 ```
 
 ## Features
@@ -86,11 +93,11 @@ Full documentation is available at **[vlebo.github.io/ctx](https://vlebo.github.
 - [Configuration Overview](https://vlebo.github.io/ctx/configuration/overview/) - Complete configuration reference
 - [Context Inheritance](https://vlebo.github.io/ctx/configuration/inheritance/) - Avoid repeating configuration
 - [CLI Reference](https://vlebo.github.io/ctx/commands/) - All available commands
-- [AWS Setup](https://vlebo.github.io/ctx/providers/aws/) - SSO, aws-vault, Secrets Manager
-- [Secrets Management](https://vlebo.github.io/ctx/providers/secrets/) - Bitwarden, 1Password, Vault, and more
+- [AWS Setup](https://vlebo.github.io/ctx/cloud/aws/) - SSO, aws-vault, Secrets Manager
+- [Secrets Management](https://vlebo.github.io/ctx/secrets/) - Bitwarden, 1Password, Vault, and more
 - [VPN](https://vlebo.github.io/ctx/features/vpn/) - OpenVPN, WireGuard, Tailscale
 - [SSH Tunnels](https://vlebo.github.io/ctx/features/tunnels/) - Auto-connect tunnels
-- [Tips & Best Practices](https://vlebo.github.io/ctx/tips/) - Production safety, credential isolation
+- [Tips & Best Practices](https://vlebo.github.io/ctx/guides/tips/) - Production safety, credential isolation
 
 ## Platform Support
 
