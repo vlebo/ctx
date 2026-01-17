@@ -28,7 +28,7 @@ SPDX-FileCopyrightText = "2026 Vedran Lebo <vedran@flyingpenguin.tech>"
 SPDX-License-Identifier = "MIT"
 
 [[annotations]]
-path = ["README.md", "CONTRIBUTING.md"]
+path = ["README.md", "CONTRIBUTING.md", "CHANGELOG.md"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Vedran Lebo <vedran@flyingpenguin.tech>"
 SPDX-License-Identifier = "MIT"
