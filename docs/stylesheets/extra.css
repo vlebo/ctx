@@ -1,0 +1,115 @@
+/* Match ctx website colors - toned down */
+:root {
+  --md-primary-fg-color: #b45309;
+  --md-primary-fg-color--light: #d97706;
+  --md-primary-fg-color--dark: #92400e;
+  --md-accent-fg-color: #b45309;
+  --md-accent-fg-color--transparent: rgba(180, 83, 9, 0.1);
+}
+
+[data-md-color-scheme="slate"] {
+  --md-primary-fg-color: #b45309;
+  --md-primary-fg-color--light: #d97706;
+  --md-primary-fg-color--dark: #92400e;
+  --md-accent-fg-color: #b45309;
+  --md-accent-fg-color--transparent: rgba(180, 83, 9, 0.1);
+}
+
+/* Logo text styling */
+.md-header__topic {
+  font-family: monospace;
+}
+
+/* Terminal animation */
+.terminal {
+  background: #2d2a26;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 1.5rem 0;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Mono', monospace;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.terminal-header {
+  background: #3d3a36;
+  padding: 8px 12px;
+  display: flex;
+  gap: 6px;
+}
+
+.terminal-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #6a6764;
+}
+
+.terminal-body {
+  padding: 16px;
+  color: #e8e6e3;
+  height: 320px;
+  position: relative;
+  overflow: hidden;
+}
+
+.term-line {
+  white-space: pre;
+  opacity: 0;
+  animation: fadeIn 0.3s forwards;
+}
+
+.term-prompt { color: #4d7c4d; }
+.term-cmd { color: #b45309; }
+.term-dim { color: #7a756f; }
+.term-key { color: #9f8f6b; }
+.term-green { color: #4d7c4d; }
+.term-red { color: #c53030; }
+.term-ctx { color: #4a7ab0; }
+
+/* Phase animations - 24s cycle */
+.phase-1 { animation: phase1 24s infinite; }
+.phase-2 { animation: phase2 24s infinite; }
+.phase-3 { animation: phase3 24s infinite; }
+
+@keyframes phase1 {
+  0%, 5% { opacity: 0; }
+  8%, 30% { opacity: 1; }
+  33%, 100% { opacity: 0; }
+}
+
+@keyframes phase2 {
+  0%, 33% { opacity: 0; }
+  36%, 63% { opacity: 1; }
+  66%, 100% { opacity: 0; }
+}
+
+@keyframes phase3 {
+  0%, 66% { opacity: 0; }
+  69%, 97% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.phase-container {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+}
+
+@keyframes fadeIn {
+  to { opacity: 1; }
+}
+
+.l1 { animation-delay: 0s; }
+.l2 { animation-delay: 0.1s; }
+.l3 { animation-delay: 0.2s; }
+.l4 { animation-delay: 0.3s; }
+.l5 { animation-delay: 0.4s; }
+.l6 { animation-delay: 0.5s; }
+.l7 { animation-delay: 0.6s; }
+.l8 { animation-delay: 0.7s; }
+.l9 { animation-delay: 0.8s; }
+.l10 { animation-delay: 0.9s; }
+.l11 { animation-delay: 1.0s; }
+.l12 { animation-delay: 1.1s; }

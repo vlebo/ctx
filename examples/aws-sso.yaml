@@ -1,0 +1,20 @@
+# AWS SSO context example
+# Auto-login to AWS via SSO when switching contexts
+
+name: acme-production
+description: "ACME Production Environment"
+environment: production
+
+aws:
+  profile: acme-prod
+  region: us-east-1
+  sso_login: true                 # Auto-run 'aws sso login'
+
+kubernetes:
+  context: arn:aws:eks:us-east-1:123456789:cluster/production
+  namespace: default
+
+# Use a specific browser profile for SSO
+browser:
+  type: chrome
+  profile: "Work"

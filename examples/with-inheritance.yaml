@@ -1,0 +1,49 @@
+# Context inheritance example
+# Shows base context and child contexts
+
+# ============================================
+# Base context (save as: acme-base.yaml)
+# ============================================
+# name: acme-base
+# abstract: true                    # Cannot be used directly
+# description: "Base config for ACME Corp"
+#
+# aws:
+#   region: us-east-1
+#
+# ssh:
+#   bastion:
+#     host: bastion.acme.com
+#     user: deploy
+#     identity_file: ~/.ssh/acme_rsa
+#
+# git:
+#   user_email: "you@acme.com"
+#
+# urls:
+#   jira: https://acme.atlassian.net
+#   wiki: https://wiki.acme.com
+
+# ============================================
+# Child context (this file)
+# ============================================
+name: acme-prod
+extends: acme-base               # Inherits from base
+environment: production
+
+aws:
+  profile: acme-prod             # Adds to inherited aws config
+
+kubernetes:
+  context: prod-cluster
+  namespace: production
+
+vpn:
+  type: wireguard
+  interface: wg-acme
+  auto_connect: true
+
+# Don't disconnect VPN when switching away
+# (useful when multiple contexts share same VPN)
+deactivate:
+  disconnect_vpn: false
