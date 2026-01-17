@@ -158,7 +158,7 @@ secrets:
     ENV_VAR_NAME: "path#field"    # Vault path and field
 ```
 
-See [Secrets Management](../features/secrets.md) for details.
+See [Secrets Management](../secrets/index.md) for details.
 
 ## Git
 
