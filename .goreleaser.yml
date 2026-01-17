@@ -56,3 +56,5 @@ release:
   draft: false
   prerelease: auto
   name_template: "{{.ProjectName}} v{{.Version}}"
+  extra_files:
+    - glob: install.sh
