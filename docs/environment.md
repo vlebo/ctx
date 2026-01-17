@@ -135,7 +135,7 @@ secrets:
     API_KEY: "prod/api-keys#stripe"   # Sets API_KEY
 ```
 
-See [Secrets Management](features/secrets.md) for details.
+See [Secrets Management](secrets/index.md) for details.
 
 ## Variable Precedence
 
