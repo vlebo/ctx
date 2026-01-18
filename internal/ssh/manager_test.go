@@ -100,7 +100,7 @@ func TestLoadState_InvalidJSON(t *testing.T) {
 
 	// Write invalid JSON
 	statePath := filepath.Join(tmpDir, "test-context.json")
-	err := os.WriteFile(statePath, []byte("invalid json"), 0644)
+	err := os.WriteFile(statePath, []byte("invalid json"), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}
@@ -122,7 +122,7 @@ func TestLoadState_Valid(t *testing.T) {
 		"started_at": "2024-01-01T00:00:00Z",
 		"tunnels": []
 	}`
-	err := os.WriteFile(statePath, []byte(stateJSON), 0644)
+	err := os.WriteFile(statePath, []byte(stateJSON), 0o644)
 	if err != nil {
 		t.Fatalf("Failed to write test file: %v", err)
 	}

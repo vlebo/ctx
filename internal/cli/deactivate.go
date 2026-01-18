@@ -18,9 +18,7 @@ import (
 	"github.com/vlebo/ctx/pkg/types"
 )
 
-var (
-	deactivateExportFlag bool
-)
+var deactivateExportFlag bool
 
 func newDeactivateCmd() *cobra.Command {
 	cmd := &cobra.Command{

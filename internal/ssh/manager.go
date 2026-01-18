@@ -18,34 +18,35 @@ import (
 
 // Manager manages multiple SSH tunnels for a context.
 type Manager struct {
-	contextName string
-	sshConfig   *types.SSHConfig
-	tunnelDefs  []types.TunnelConfig
-	stateDir    string
+	ctx       context.Context
+	sshConfig *types.SSHConfig
 
 	conn    *Connection
 	tunnels map[string]*Tunnel
 
-	ctx    context.Context
-	cancel context.CancelFunc
-	wg     sync.WaitGroup
-	mu     sync.RWMutex
+	cancel      context.CancelFunc
+	contextName string
+	stateDir    string
 
-	// Reconnect settings
-	reconnectEnabled  bool
+	tunnelDefs        []types.TunnelConfig
+	wg                sync.WaitGroup
 	reconnectInterval time.Duration
 	maxReconnectDelay time.Duration
+	mu                sync.RWMutex
+
+	// Reconnect settings
+	reconnectEnabled bool
 }
 
 // ManagerConfig holds configuration for the tunnel manager.
 type ManagerConfig struct {
-	ContextName       string
 	SSHConfig         *types.SSHConfig
-	TunnelDefs        []types.TunnelConfig
+	ContextName       string
 	StateDir          string
-	ReconnectEnabled  bool
+	TunnelDefs        []types.TunnelConfig
 	ReconnectInterval time.Duration
 	MaxReconnectDelay time.Duration
+	ReconnectEnabled  bool
 }
 
 // NewManager creates a new tunnel manager.
@@ -248,10 +249,7 @@ func (m *Manager) healthCheckLoop() {
 				// Try to reconnect
 				if err := m.reconnect(); err != nil {
 					// Exponential backoff
-					backoff = backoff * 2
-					if backoff > m.maxReconnectDelay {
-						backoff = m.maxReconnectDelay
-					}
+					backoff = min(backoff*2, m.maxReconnectDelay)
 					ticker.Reset(backoff)
 					continue
 				}
@@ -303,10 +301,10 @@ func (m *Manager) reconnect() error {
 
 // State represents the persisted state of the tunnel manager.
 type State struct {
-	ContextName string       `json:"context_name"`
-	PID         int          `json:"pid"`
 	StartedAt   time.Time    `json:"started_at"`
+	ContextName string       `json:"context_name"`
 	Tunnels     []TunnelInfo `json:"tunnels"`
+	PID         int          `json:"pid"`
 }
 
 // writeState writes the current state to a file.
@@ -329,11 +327,11 @@ func (m *Manager) writeState() error {
 		return err
 	}
 
-	if err := os.MkdirAll(m.stateDir, 0755); err != nil {
+	if err := os.MkdirAll(m.stateDir, 0o755); err != nil {
 		return err
 	}
 
-	return os.WriteFile(statePath, data, 0644)
+	return os.WriteFile(statePath, data, 0o644)
 }
 
 // removeState removes the state file.

@@ -385,7 +385,7 @@ func openURLDefault(url string) error {
 }
 
 // openURLChrome opens a URL in Chrome with the specified profile.
-func openURLChrome(profileName string, url string) error {
+func openURLChrome(profileName, url string) error {
 	profileDir, err := findChromeProfileDir(profileName)
 	if err != nil {
 		return err
@@ -404,7 +404,7 @@ func openURLChrome(profileName string, url string) error {
 }
 
 // openURLFirefox opens a URL in Firefox with the specified profile.
-func openURLFirefox(profileName string, url string) error {
+func openURLFirefox(profileName, url string) error {
 	profile, err := findFirefoxProfileName(profileName)
 	if err != nil {
 		return err

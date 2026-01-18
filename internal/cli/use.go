@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/fatih/color"
@@ -583,7 +584,7 @@ func getBrowserCommand(cfg *types.BrowserConfig) string {
 		return ""
 	}
 	tmpFile.WriteString(script)
-	tmpFile.Chmod(0755)
+	tmpFile.Chmod(0o755)
 	tmpFile.Close()
 
 	return tmpFile.Name()
@@ -639,12 +640,7 @@ func printSwitchSuccess(ctx *types.ContextConfig, failures []string) {
 
 	// Helper to check if an item failed
 	failed := func(name string) bool {
-		for _, f := range failures {
-			if f == name {
-				return true
-			}
-		}
-		return false
+		return slices.Contains(failures, name)
 	}
 
 	fmt.Println()

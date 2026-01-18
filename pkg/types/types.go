@@ -4,7 +4,11 @@
 // Package types contains shared type definitions for the ctx CLI tool.
 package types
 
-import "dario.cat/mergo"
+import (
+	"maps"
+
+	"dario.cat/mergo"
+)
 
 // Environment represents the deployment environment type (can be any string).
 type Environment string
@@ -81,18 +85,18 @@ type ConsulConfig struct {
 type BastionConfig struct {
 	Host         string `yaml:"host" mapstructure:"host"`
 	User         string `yaml:"user" mapstructure:"user"`
-	Port         int    `yaml:"port" mapstructure:"port"`
 	IdentityFile string `yaml:"identity_file" mapstructure:"identity_file"`
+	Port         int    `yaml:"port" mapstructure:"port"`
 }
 
 // SSHConfig holds SSH-specific configuration.
 type SSHConfig struct {
-	Bastion           BastionConfig `yaml:"bastion" mapstructure:"bastion"`
-	Persistent        bool          `yaml:"persistent" mapstructure:"persistent"`
-	KeepaliveInterval int           `yaml:"keepalive_interval" mapstructure:"keepalive_interval"`
-	KeepaliveCountMax int           `yaml:"keepalive_count_max" mapstructure:"keepalive_count_max"`
 	ControlMaster     string        `yaml:"control_master" mapstructure:"control_master"`
 	ControlPersist    string        `yaml:"control_persist" mapstructure:"control_persist"`
+	Bastion           BastionConfig `yaml:"bastion" mapstructure:"bastion"`
+	KeepaliveInterval int           `yaml:"keepalive_interval" mapstructure:"keepalive_interval"`
+	KeepaliveCountMax int           `yaml:"keepalive_count_max" mapstructure:"keepalive_count_max"`
+	Persistent        bool          `yaml:"persistent" mapstructure:"persistent"`
 }
 
 // TunnelConfig holds configuration for a single tunnel.
@@ -150,10 +154,10 @@ type VaultConfig struct {
 	Address    string          `yaml:"address" mapstructure:"address"`
 	Namespace  string          `yaml:"namespace,omitempty" mapstructure:"namespace"`
 	AuthMethod VaultAuthMethod `yaml:"auth_method,omitempty" mapstructure:"auth_method"`
-	AutoLogin  bool            `yaml:"auto_login,omitempty" mapstructure:"auto_login"`
 	TokenEnv   string          `yaml:"token_env,omitempty" mapstructure:"token_env"`
 	RoleID     string          `yaml:"role_id,omitempty" mapstructure:"role_id"`
 	SecretID   string          `yaml:"secret_id_env,omitempty" mapstructure:"secret_id_env"`
+	AutoLogin  bool            `yaml:"auto_login,omitempty" mapstructure:"auto_login"`
 	SkipVerify bool            `yaml:"skip_verify,omitempty" mapstructure:"skip_verify"`
 }
 
@@ -167,9 +171,9 @@ type BitwardenConfig struct {
 
 // OnePasswordConfig holds 1Password authentication configuration.
 type OnePasswordConfig struct {
+	Account   string `yaml:"account,omitempty" mapstructure:"account"`       // Account shorthand or URL (e.g., "my.1password.com")
 	AutoLogin bool   `yaml:"auto_login,omitempty" mapstructure:"auto_login"` // Auto-run 'op signin' if not authenticated
 	SSO       bool   `yaml:"sso,omitempty" mapstructure:"sso"`               // Use SSO login instead of email/password
-	Account   string `yaml:"account,omitempty" mapstructure:"account"`       // Account shorthand or URL (e.g., "my.1password.com")
 }
 
 // GitConfig holds Git identity configuration for per-client commits.
@@ -212,11 +216,11 @@ type DatabaseConfig struct {
 	Name        string       `yaml:"name" mapstructure:"name"`
 	Type        DatabaseType `yaml:"type" mapstructure:"type"`
 	Host        string       `yaml:"host" mapstructure:"host"`
-	Port        int          `yaml:"port" mapstructure:"port"`
 	Database    string       `yaml:"database,omitempty" mapstructure:"database"`
 	Username    string       `yaml:"username,omitempty" mapstructure:"username"`
 	PasswordEnv string       `yaml:"password_env,omitempty" mapstructure:"password_env"`
 	SSLMode     string       `yaml:"ssl_mode,omitempty" mapstructure:"ssl_mode"`
+	Port        int          `yaml:"port" mapstructure:"port"`
 }
 
 // ProxyConfig holds HTTP proxy configuration.
@@ -255,13 +259,6 @@ type BrowserConfig struct {
 
 // ContextConfig represents a complete context configuration.
 type ContextConfig struct {
-	Name        string      `yaml:"name" mapstructure:"name"`
-	Extends     string      `yaml:"extends,omitempty" mapstructure:"extends"`   // Parent context to inherit from
-	Abstract    bool        `yaml:"abstract,omitempty" mapstructure:"abstract"` // If true, context is a template and cannot be used directly
-	Description string      `yaml:"description" mapstructure:"description"`
-	Environment Environment `yaml:"environment" mapstructure:"environment"`
-	EnvColor    string      `yaml:"env_color,omitempty" mapstructure:"env_color"` // red, yellow, green, blue, cyan, magenta, white
-	Tags        []string    `yaml:"tags" mapstructure:"tags"`
 	// Cloud Providers
 	AWS   *AWSConfig   `yaml:"aws,omitempty" mapstructure:"aws"`
 	GCP   *GCPConfig   `yaml:"gcp,omitempty" mapstructure:"gcp"`
@@ -271,8 +268,7 @@ type ContextConfig struct {
 	Nomad      *NomadConfig      `yaml:"nomad,omitempty" mapstructure:"nomad"`
 	Consul     *ConsulConfig     `yaml:"consul,omitempty" mapstructure:"consul"`
 	// SSH & Tunnels
-	SSH     *SSHConfig     `yaml:"ssh,omitempty" mapstructure:"ssh"`
-	Tunnels []TunnelConfig `yaml:"tunnels,omitempty" mapstructure:"tunnels"`
+	SSH *SSHConfig `yaml:"ssh,omitempty" mapstructure:"ssh"`
 	// VPN
 	VPN *VPNConfig `yaml:"vpn,omitempty" mapstructure:"vpn"`
 	// Secrets & Identity
@@ -284,8 +280,6 @@ type ContextConfig struct {
 	// Registries
 	Docker *DockerRegistryConfig `yaml:"docker,omitempty" mapstructure:"docker"`
 	NPM    *NPMConfig            `yaml:"npm,omitempty" mapstructure:"npm"`
-	// Databases
-	Databases []DatabaseConfig `yaml:"databases,omitempty" mapstructure:"databases"`
 	// Proxy
 	Proxy *ProxyConfig `yaml:"proxy,omitempty" mapstructure:"proxy"`
 	// Browser
@@ -295,7 +289,17 @@ type ContextConfig struct {
 	// URLs for quick access (ctx open)
 	URLs map[string]string `yaml:"urls,omitempty" mapstructure:"urls"`
 	// Deactivate behavior (overrides global config)
-	Deactivate *DeactivateConfig `yaml:"deactivate,omitempty" mapstructure:"deactivate"`
+	Deactivate  *DeactivateConfig `yaml:"deactivate,omitempty" mapstructure:"deactivate"`
+	Name        string            `yaml:"name" mapstructure:"name"`
+	Extends     string            `yaml:"extends,omitempty" mapstructure:"extends"` // Parent context to inherit from
+	Description string            `yaml:"description" mapstructure:"description"`
+	Environment Environment       `yaml:"environment" mapstructure:"environment"`
+	EnvColor    string            `yaml:"env_color,omitempty" mapstructure:"env_color"` // red, yellow, green, blue, cyan, magenta, white
+	Tags        []string          `yaml:"tags" mapstructure:"tags"`
+	Tunnels     []TunnelConfig    `yaml:"tunnels,omitempty" mapstructure:"tunnels"`
+	// Databases
+	Databases []DatabaseConfig `yaml:"databases,omitempty" mapstructure:"databases"`
+	Abstract  bool             `yaml:"abstract,omitempty" mapstructure:"abstract"` // If true, context is a template and cannot be used directly
 }
 
 // GetCloudProviders returns a list of configured cloud providers.
@@ -393,22 +397,16 @@ func (c *ContextConfig) MergeFrom(other *ContextConfig) {
 	// Maps: merge with child values taking precedence
 	if len(other.Env) > 0 || len(childEnv) > 0 {
 		merged := make(map[string]string)
-		for k, v := range other.Env {
-			merged[k] = v
-		}
-		for k, v := range childEnv {
-			merged[k] = v // child overrides
-		}
+		maps.Copy(merged, other.Env)
+		// child overrides
+		maps.Copy(merged, childEnv)
 		c.Env = merged
 	}
 	if len(other.URLs) > 0 || len(childURLs) > 0 {
 		merged := make(map[string]string)
-		for k, v := range other.URLs {
-			merged[k] = v
-		}
-		for k, v := range childURLs {
-			merged[k] = v // child overrides
-		}
+		maps.Copy(merged, other.URLs)
+		// child overrides
+		maps.Copy(merged, childURLs)
 		c.URLs = merged
 	}
 
@@ -444,12 +442,12 @@ func NewDeactivateConfigDefaults() *DeactivateConfig {
 
 // AppConfig represents the main application configuration.
 type AppConfig struct {
-	Version          int               `yaml:"version" mapstructure:"version"`
+	Deactivate       *DeactivateConfig `yaml:"deactivate,omitempty" mapstructure:"deactivate"`
 	DefaultContext   string            `yaml:"default_context" mapstructure:"default_context"`
-	ShellIntegration bool              `yaml:"shell_integration" mapstructure:"shell_integration"`
 	PromptFormat     string            `yaml:"prompt_format" mapstructure:"prompt_format"`
 	TunnelsDir       string            `yaml:"tunnels_dir" mapstructure:"tunnels_dir"`
 	ContextsDir      string            `yaml:"contexts_dir" mapstructure:"contexts_dir"`
+	Version          int               `yaml:"version" mapstructure:"version"`
+	ShellIntegration bool              `yaml:"shell_integration" mapstructure:"shell_integration"`
 	AutoDeactivate   bool              `yaml:"auto_deactivate" mapstructure:"auto_deactivate"`
-	Deactivate       *DeactivateConfig `yaml:"deactivate,omitempty" mapstructure:"deactivate"`
 }

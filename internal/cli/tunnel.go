@@ -21,9 +21,7 @@ import (
 	"github.com/vlebo/ctx/pkg/types"
 )
 
-var (
-	tunnelBackground bool
-)
+var tunnelBackground bool
 
 func newTunnelCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -174,7 +172,7 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 
 	// Get state directory
 	stateDir := filepath.Join(mgr.StateDir(), "tunnels")
-	if err := os.MkdirAll(stateDir, 0755); err != nil {
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create state directory: %w", err)
 	}
 
@@ -238,7 +236,7 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 
 		// Redirect output to log file
 		logFile := filepath.Join(stateDir, fmt.Sprintf("%s-%s.log", ctx.Name, t.Name))
-		logFd, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		logFd, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 		if err != nil {
 			yellow.Printf("⚠ %s: failed to create log file: %v\n", t.Name, err)
 			continue
@@ -338,18 +336,18 @@ func buildSSHArgs(sshConfig *types.SSHConfig, tunnels []types.TunnelConfig) []st
 // tunnelState represents the persisted state of running tunnels.
 // Now stores one PID per tunnel for independent management.
 type tunnelState struct {
-	ContextName string                 `json:"context_name"`
-	PID         int                    `json:"pid,omitempty"`         // Deprecated: for backwards compat
-	StartedAt   time.Time              `json:"started_at,omitempty"`  // Deprecated
-	Tunnels     []types.TunnelConfig   `json:"tunnels,omitempty"`     // Deprecated
+	StartedAt   time.Time              `json:"started_at"`            // Deprecated
 	TunnelPIDs  map[string]tunnelEntry `json:"tunnel_pids,omitempty"` // New: per-tunnel PIDs
+	ContextName string                 `json:"context_name"`
+	Tunnels     []types.TunnelConfig   `json:"tunnels,omitempty"` // Deprecated
+	PID         int                    `json:"pid,omitempty"`     // Deprecated: for backwards compat
 }
 
 // tunnelEntry represents a single running tunnel.
 type tunnelEntry struct {
-	PID       int                `json:"pid"`
 	StartedAt time.Time          `json:"started_at"`
 	Config    types.TunnelConfig `json:"config"`
+	PID       int                `json:"pid"`
 }
 
 func loadTunnelState(path string) (*tunnelState, error) {
@@ -369,7 +367,7 @@ func saveTunnelState(path string, state *tunnelState) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0644)
+	return os.WriteFile(path, data, 0o644)
 }
 
 func isProcessRunning(pid int) bool {
@@ -399,7 +397,7 @@ func isPortAvailable(port int) bool {
 func findAvailablePort(startPort int) (int, bool) {
 	port := startPort
 	maxAttempts := 100 // Don't search forever
-	for i := 0; i < maxAttempts; i++ {
+	for range maxAttempts {
 		if isPortAvailable(port) {
 			return port, port != startPort
 		}
@@ -520,7 +518,7 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *types.ContextConfig) erro
 
 	// Get state directory
 	stateDir := filepath.Join(mgr.StateDir(), "tunnels")
-	if err := os.MkdirAll(stateDir, 0755); err != nil {
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create state directory: %w", err)
 	}
 
@@ -567,7 +565,7 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *types.ContextConfig) erro
 
 		// Redirect output to log file
 		logFile := filepath.Join(stateDir, fmt.Sprintf("%s-%s.log", ctx.Name, t.Name))
-		logFd, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+		logFd, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 		if err != nil {
 			yellow.Fprintf(os.Stderr, "⚠ %s: failed to create log file: %v\n", t.Name, err)
 			continue

@@ -20,11 +20,11 @@ import (
 
 // Connection represents an SSH connection to a bastion host.
 type Connection struct {
+	connectedAt time.Time
+	lastError   error
 	config      *types.SSHConfig
 	client      *ssh.Client
 	connected   bool
-	lastError   error
-	connectedAt time.Time
 }
 
 // NewConnection creates a new SSH connection manager.

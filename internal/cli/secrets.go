@@ -17,13 +17,13 @@ import (
 
 // SecretsResult holds resolved secrets and metadata about what was loaded.
 type SecretsResult struct {
-	Secrets              map[string]string
-	BitwardenCount       int
-	OnePasswordCount     int
-	VaultCount           int
+	Secrets                map[string]string
+	BitwardenCount         int
+	OnePasswordCount       int
+	VaultCount             int
 	AWSSecretsManagerCount int
-	AWSSSMCount          int
-	GCPSecretManagerCount int
+	AWSSSMCount            int
+	GCPSecretManagerCount  int
 }
 
 // resolveAllSecrets fetches secrets from all configured providers.
@@ -588,8 +588,9 @@ func getOnePasswordSecret(itemSpec string) (string, error) {
 // For KV v2, you can use either:
 //   - CLI-style: "mount/path#field" (e.g., "operations/consul#http_user")
 //   - API-style: "mount/data/path#field" (e.g., "operations/data/consul#http_user") - data/ is auto-stripped
+//
 // vaultToken is optional - if provided, it's used for authentication.
-func getVaultSecret(cfg *types.VaultConfig, vaultToken string, pathSpec string) (string, error) {
+func getVaultSecret(cfg *types.VaultConfig, vaultToken, pathSpec string) (string, error) {
 	// Parse path and field
 	path := pathSpec
 	field := "value" // default field for KV v1
@@ -677,10 +678,12 @@ func getAWSSecretsManagerSecret(cfg *types.AWSConfig, awsCreds *config.AWSCreden
 	}
 
 	// Build AWS CLI command
-	args := []string{"secretsmanager", "get-secret-value",
+	args := []string{
+		"secretsmanager", "get-secret-value",
 		"--secret-id", secretName,
 		"--query", "SecretString",
-		"--output", "text"}
+		"--output", "text",
+	}
 
 	cmd := exec.Command("aws", args...)
 
@@ -709,7 +712,7 @@ func getAWSSecretsManagerSecret(cfg *types.AWSConfig, awsCreds *config.AWSCreden
 
 	// If a JSON key was specified, extract it
 	if jsonKey != "" {
-		var data map[string]interface{}
+		var data map[string]any
 		if err := json.Unmarshal([]byte(secretValue), &data); err != nil {
 			return "", fmt.Errorf("failed to parse secret as JSON: %w", err)
 		}
@@ -725,11 +728,13 @@ func getAWSSecretsManagerSecret(cfg *types.AWSConfig, awsCreds *config.AWSCreden
 // getAWSSSMParameter fetches a parameter from AWS Systems Manager Parameter Store.
 // awsCreds are optional temporary credentials from aws-vault.
 func getAWSSSMParameter(cfg *types.AWSConfig, awsCreds *config.AWSCredentials, paramPath string) (string, error) {
-	args := []string{"ssm", "get-parameter",
+	args := []string{
+		"ssm", "get-parameter",
 		"--name", paramPath,
 		"--with-decryption",
 		"--query", "Parameter.Value",
-		"--output", "text"}
+		"--output", "text",
+	}
 
 	cmd := exec.Command("aws", args...)
 
@@ -761,7 +766,7 @@ func getAWSSSMParameter(cfg *types.AWSConfig, awsCreds *config.AWSCredentials, p
 // secretSpec format: "secret-name" (uses latest version) or full resource name
 // e.g., "my-secret" or "projects/my-project/secrets/my-secret/versions/latest"
 // gcpConfigDir is the per-context gcloud config directory.
-func getGCPSecret(cfg *types.GCPConfig, gcpConfigDir string, secretSpec string) (string, error) {
+func getGCPSecret(cfg *types.GCPConfig, gcpConfigDir, secretSpec string) (string, error) {
 	var secretPath string
 
 	// Check if it's a full resource path or just a secret name

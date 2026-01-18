@@ -435,10 +435,10 @@ func checkAnyVPNRunning(expected *types.VPNConfig) string {
 		lines := strings.TrimSpace(string(output))
 		if lines != "" {
 			// Extract config file name from the command line
-			for _, line := range strings.Split(lines, "\n") {
+			for line := range strings.SplitSeq(lines, "\n") {
 				if strings.Contains(line, ".ovpn") || strings.Contains(line, ".conf") {
-					parts := strings.Fields(line)
-					for _, part := range parts {
+					parts := strings.FieldsSeq(line)
+					for part := range parts {
 						if strings.HasSuffix(part, ".ovpn") || strings.HasSuffix(part, ".conf") {
 							return fmt.Sprintf("openvpn (%s)", filepath.Base(part))
 						}
