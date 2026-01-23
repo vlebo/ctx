@@ -58,11 +58,34 @@ type AzureConfig struct {
 	AutoLogin      bool   `yaml:"auto_login,omitempty" mapstructure:"auto_login"`
 }
 
+// AKSConfig holds Azure Kubernetes Service configuration for auto-fetching credentials.
+type AKSConfig struct {
+	Cluster       string `yaml:"cluster" mapstructure:"cluster"`
+	ResourceGroup string `yaml:"resource_group" mapstructure:"resource_group"`
+}
+
+// EKSConfig holds AWS Elastic Kubernetes Service configuration for auto-fetching credentials.
+type EKSConfig struct {
+	Cluster string `yaml:"cluster" mapstructure:"cluster"`
+	Region  string `yaml:"region,omitempty" mapstructure:"region"` // Optional, falls back to aws.region
+}
+
+// GKEConfig holds Google Kubernetes Engine configuration for auto-fetching credentials.
+type GKEConfig struct {
+	Cluster string `yaml:"cluster" mapstructure:"cluster"`
+	Zone    string `yaml:"zone,omitempty" mapstructure:"zone"`       // Zonal cluster
+	Region  string `yaml:"region,omitempty" mapstructure:"region"`   // Regional cluster
+	Project string `yaml:"project,omitempty" mapstructure:"project"` // Optional, falls back to gcp.project
+}
+
 // KubernetesConfig holds Kubernetes-specific configuration.
 type KubernetesConfig struct {
-	Context    string `yaml:"context" mapstructure:"context"`
-	Namespace  string `yaml:"namespace" mapstructure:"namespace"`
-	Kubeconfig string `yaml:"kubeconfig" mapstructure:"kubeconfig"`
+	Context    string     `yaml:"context,omitempty" mapstructure:"context"`
+	Namespace  string     `yaml:"namespace,omitempty" mapstructure:"namespace"`
+	Kubeconfig string     `yaml:"kubeconfig,omitempty" mapstructure:"kubeconfig"`
+	AKS        *AKSConfig `yaml:"aks,omitempty" mapstructure:"aks"`
+	EKS        *EKSConfig `yaml:"eks,omitempty" mapstructure:"eks"`
+	GKE        *GKEConfig `yaml:"gke,omitempty" mapstructure:"gke"`
 }
 
 // NomadConfig holds Nomad-specific configuration.
@@ -163,10 +186,11 @@ type VaultConfig struct {
 
 // BitwardenConfig holds Bitwarden authentication configuration.
 type BitwardenConfig struct {
-	Server    string `yaml:"server,omitempty" mapstructure:"server"`         // Self-hosted Bitwarden server URL
-	Email     string `yaml:"email,omitempty" mapstructure:"email"`           // Email for login (pre-fills prompt)
-	AutoLogin bool   `yaml:"auto_login,omitempty" mapstructure:"auto_login"` // Auto-run 'bw login' if not authenticated
-	SSO       bool   `yaml:"sso,omitempty" mapstructure:"sso"`               // Use SSO login instead of email/password
+	Server        string `yaml:"server,omitempty" mapstructure:"server"`                 // Self-hosted Bitwarden server URL
+	Email         string `yaml:"email,omitempty" mapstructure:"email"`                   // Email for login (pre-fills prompt)
+	OrgIdentifier string `yaml:"org_identifier,omitempty" mapstructure:"org_identifier"` // Organization identifier for SSO login
+	AutoLogin     bool   `yaml:"auto_login,omitempty" mapstructure:"auto_login"`         // Auto-run 'bw login' if not authenticated
+	SSO           bool   `yaml:"sso,omitempty" mapstructure:"sso"`                       // Use SSO login instead of email/password
 }
 
 // OnePasswordConfig holds 1Password authentication configuration.

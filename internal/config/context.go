@@ -82,12 +82,36 @@ func FormatContextDetails(ctx *types.ContextConfig) string {
 	if ctx.Kubernetes != nil || ctx.Nomad != nil || ctx.Consul != nil {
 		sb.WriteString("\nOrchestration:\n")
 		if ctx.Kubernetes != nil {
-			sb.WriteString(fmt.Sprintf("  Kubernetes Context: %s\n", ctx.Kubernetes.Context))
+			if ctx.Kubernetes.Context != "" {
+				sb.WriteString(fmt.Sprintf("  Kubernetes Context: %s\n", ctx.Kubernetes.Context))
+			}
 			if ctx.Kubernetes.Namespace != "" {
 				sb.WriteString(fmt.Sprintf("  Kubernetes Namespace: %s\n", ctx.Kubernetes.Namespace))
 			}
 			if ctx.Kubernetes.Kubeconfig != "" {
 				sb.WriteString(fmt.Sprintf("  Kubeconfig: %s\n", ctx.Kubernetes.Kubeconfig))
+			}
+			if ctx.Kubernetes.AKS != nil {
+				sb.WriteString(fmt.Sprintf("  AKS Cluster: %s (resource group: %s)\n",
+					ctx.Kubernetes.AKS.Cluster, ctx.Kubernetes.AKS.ResourceGroup))
+			}
+			if ctx.Kubernetes.EKS != nil {
+				region := ctx.Kubernetes.EKS.Region
+				if region == "" && ctx.AWS != nil {
+					region = ctx.AWS.Region
+				}
+				sb.WriteString(fmt.Sprintf("  EKS Cluster: %s (region: %s)\n", ctx.Kubernetes.EKS.Cluster, region))
+			}
+			if ctx.Kubernetes.GKE != nil {
+				location := ctx.Kubernetes.GKE.Zone
+				if location == "" {
+					location = ctx.Kubernetes.GKE.Region
+				}
+				project := ctx.Kubernetes.GKE.Project
+				if project == "" && ctx.GCP != nil {
+					project = ctx.GCP.Project
+				}
+				sb.WriteString(fmt.Sprintf("  GKE Cluster: %s (%s, project: %s)\n", ctx.Kubernetes.GKE.Cluster, location, project))
 			}
 		}
 		if ctx.Nomad != nil {
@@ -316,6 +340,38 @@ func ValidateContext(ctx *types.ContextConfig) error {
 	if len(ctx.Tunnels) > 0 {
 		if ctx.SSH == nil || ctx.SSH.Bastion.Host == "" {
 			return fmt.Errorf("SSH bastion must be configured when tunnels are defined")
+		}
+	}
+
+	// Validate Kubernetes cloud config
+	if ctx.Kubernetes != nil {
+		cloudConfigs := 0
+		if ctx.Kubernetes.AKS != nil {
+			cloudConfigs++
+			if ctx.Kubernetes.AKS.Cluster == "" {
+				return fmt.Errorf("kubernetes.aks.cluster is required")
+			}
+			if ctx.Kubernetes.AKS.ResourceGroup == "" {
+				return fmt.Errorf("kubernetes.aks.resource_group is required")
+			}
+		}
+		if ctx.Kubernetes.EKS != nil {
+			cloudConfigs++
+			if ctx.Kubernetes.EKS.Cluster == "" {
+				return fmt.Errorf("kubernetes.eks.cluster is required")
+			}
+		}
+		if ctx.Kubernetes.GKE != nil {
+			cloudConfigs++
+			if ctx.Kubernetes.GKE.Cluster == "" {
+				return fmt.Errorf("kubernetes.gke.cluster is required")
+			}
+			if ctx.Kubernetes.GKE.Zone == "" && ctx.Kubernetes.GKE.Region == "" {
+				return fmt.Errorf("kubernetes.gke requires either zone or region")
+			}
+		}
+		if cloudConfigs > 1 {
+			return fmt.Errorf("kubernetes: only one of aks, eks, or gke can be configured")
 		}
 	}
 

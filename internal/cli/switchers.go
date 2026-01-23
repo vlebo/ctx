@@ -68,12 +68,48 @@ func switchOpenVPN(cfg *types.VPNConfig) error {
 	}
 
 	yellow := color.New(color.FgYellow)
+
+	// Add DNS update script if available (for proper DNS resolution)
+	dnsScript := findDNSUpdateScript()
+	if dnsScript != "" {
+		args = append(args,
+			"--script-security", "2",
+			"--up", dnsScript,
+			"--down", dnsScript,
+		)
+	} else {
+		yellow.Fprintln(os.Stderr, "⚠ No DNS update script found. VPN DNS resolution may not work.")
+		yellow.Fprintln(os.Stderr, "  Install 'openvpn-systemd-resolved' or configure VPN in NetworkManager.")
+	}
+
 	yellow.Println("⚠ OpenVPN requires sudo. You may be prompted for your password.")
 
 	cmd := exec.Command("sudo", append([]string{"openvpn"}, args...)...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+// findDNSUpdateScript looks for common OpenVPN DNS update scripts.
+func findDNSUpdateScript() string {
+	scripts := []string{
+		// Linux - systemd-resolved (preferred)
+		"/etc/openvpn/update-systemd-resolved",
+		"/usr/share/openvpn/update-systemd-resolved",
+		// Linux - resolvconf
+		"/etc/openvpn/update-resolv-conf",
+		"/usr/share/openvpn/update-resolv-conf",
+		// macOS - Homebrew
+		"/opt/homebrew/etc/openvpn/update-resolv-conf",
+		"/usr/local/etc/openvpn/update-resolv-conf",
+	}
+
+	for _, script := range scripts {
+		if _, err := os.Stat(script); err == nil {
+			return script
+		}
+	}
+	return ""
 }
 
 func switchWireGuard(cfg *types.VPNConfig) error {

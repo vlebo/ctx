@@ -251,6 +251,130 @@ func TestValidateContext(t *testing.T) {
 			wantErr: true,
 			errMsg:  "SSH bastion must be configured",
 		},
+		{
+			name: "valid AKS config",
+			ctx: &types.ContextConfig{
+				Name: "test",
+				Kubernetes: &types.KubernetesConfig{
+					AKS: &types.AKSConfig{
+						Cluster:       "my-cluster",
+						ResourceGroup: "my-rg",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "AKS missing cluster",
+			ctx: &types.ContextConfig{
+				Name: "test",
+				Kubernetes: &types.KubernetesConfig{
+					AKS: &types.AKSConfig{
+						ResourceGroup: "my-rg",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "kubernetes.aks.cluster is required",
+		},
+		{
+			name: "AKS missing resource group",
+			ctx: &types.ContextConfig{
+				Name: "test",
+				Kubernetes: &types.KubernetesConfig{
+					AKS: &types.AKSConfig{
+						Cluster: "my-cluster",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "kubernetes.aks.resource_group is required",
+		},
+		{
+			name: "valid EKS config",
+			ctx: &types.ContextConfig{
+				Name: "test",
+				Kubernetes: &types.KubernetesConfig{
+					EKS: &types.EKSConfig{
+						Cluster: "my-cluster",
+						Region:  "us-east-1",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "EKS missing cluster",
+			ctx: &types.ContextConfig{
+				Name: "test",
+				Kubernetes: &types.KubernetesConfig{
+					EKS: &types.EKSConfig{
+						Region: "us-east-1",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "kubernetes.eks.cluster is required",
+		},
+		{
+			name: "valid GKE config with zone",
+			ctx: &types.ContextConfig{
+				Name: "test",
+				Kubernetes: &types.KubernetesConfig{
+					GKE: &types.GKEConfig{
+						Cluster: "my-cluster",
+						Zone:    "us-central1-a",
+						Project: "my-project",
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "GKE missing cluster",
+			ctx: &types.ContextConfig{
+				Name: "test",
+				Kubernetes: &types.KubernetesConfig{
+					GKE: &types.GKEConfig{
+						Zone:    "us-central1-a",
+						Project: "my-project",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "kubernetes.gke.cluster is required",
+		},
+		{
+			name: "GKE missing zone and region",
+			ctx: &types.ContextConfig{
+				Name: "test",
+				Kubernetes: &types.KubernetesConfig{
+					GKE: &types.GKEConfig{
+						Cluster: "my-cluster",
+						Project: "my-project",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "kubernetes.gke requires either zone or region",
+		},
+		{
+			name: "multiple cloud k8s providers",
+			ctx: &types.ContextConfig{
+				Name: "test",
+				Kubernetes: &types.KubernetesConfig{
+					AKS: &types.AKSConfig{
+						Cluster:       "aks-cluster",
+						ResourceGroup: "my-rg",
+					},
+					EKS: &types.EKSConfig{
+						Cluster: "eks-cluster",
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "only one of aks, eks, or gke",
+		},
 	}
 
 	for _, tt := range tests {

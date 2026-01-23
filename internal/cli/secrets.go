@@ -292,7 +292,11 @@ func ensureBitwardenUnlocked(cfg *types.BitwardenConfig, mgr *config.Manager, co
 
 		if useSSO {
 			yellow.Fprintf(os.Stderr, "  Bitwarden SSO login - opening browser...\n")
-			loginCmd = exec.Command("bw", "login", "--sso")
+			if cfg != nil && cfg.OrgIdentifier != "" {
+				loginCmd = exec.Command("bw", "login", "--sso", cfg.OrgIdentifier)
+			} else {
+				loginCmd = exec.Command("bw", "login", "--sso")
+			}
 		} else if email != "" {
 			yellow.Fprintf(os.Stderr, "  Bitwarden login (%s)...\n", email)
 			loginCmd = exec.Command("bw", "login", email)

@@ -53,10 +53,27 @@ See [Azure Provider](../cloud/azure.md) for details.
 
 ```yaml
 kubernetes:
-  context: string           # kubectl context name
+  context: string           # kubectl context name (optional if using cloud auto-fetch)
   namespace: string         # Default namespace
   kubeconfig: string        # Path to kubeconfig file (optional)
+
+  # Auto-fetch credentials from cloud providers (mutually exclusive)
+  aks:                      # Azure Kubernetes Service
+    cluster: string         # AKS cluster name (required)
+    resource_group: string  # Azure resource group (required)
+
+  eks:                      # AWS Elastic Kubernetes Service
+    cluster: string         # EKS cluster name (required)
+    region: string          # AWS region (optional, falls back to aws.region)
+
+  gke:                      # Google Kubernetes Engine
+    cluster: string         # GKE cluster name (required)
+    zone: string            # Cluster zone (for zonal clusters)
+    region: string          # Cluster region (for regional clusters)
+    project: string         # GCP project (optional, falls back to gcp.project)
 ```
+
+When `aks`, `eks`, or `gke` is configured, ctx will automatically fetch credentials using the respective cloud CLI before switching kubectl context.
 
 ## Nomad
 
@@ -136,6 +153,9 @@ See [HashiCorp Vault](../secrets/vault.md) for details.
 bitwarden:
   auto_login: bool          # Auto-run 'bw login' if not authenticated
   sso: bool                 # Use SSO login
+  org_identifier: string    # Organization identifier for SSO login
+  server: string            # Self-hosted Bitwarden server URL
+  email: string             # Email for login (pre-fills prompt)
 ```
 
 ## 1Password

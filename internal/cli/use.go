@@ -167,7 +167,7 @@ func switchContext(mgr *config.Manager, ctx *types.ContextConfig) ([]string, err
 
 	// Switch orchestration tools
 	if ctx.Kubernetes != nil {
-		if err := switchKubernetes(ctx.Kubernetes); err != nil {
+		if err := switchKubernetes(ctx.Kubernetes, ctx, mgr); err != nil {
 			yellow.Fprintf(os.Stderr, "⚠ Kubernetes switch failed: %v\n", err)
 			failures = append(failures, "Kubernetes")
 		}
@@ -485,18 +485,20 @@ func switchAzure(cfg *types.AzureConfig, browser *types.BrowserConfig, mgr *conf
 			yellow.Println("• Azure login - opening browser...")
 		}
 
-		args := []string{"login"}
+		args := []string{"login", "--output", "none"}
 		if cfg.TenantID != "" {
 			args = append(args, "--tenant", cfg.TenantID)
 		}
 
 		cmd := exec.Command("az", args...)
 		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
-		// Set per-context config directory
-		cmd.Env = append(os.Environ(), "AZURE_CONFIG_DIR="+azureConfigDir)
+		// Set per-context config directory and disable interactive subscription picker
+		cmd.Env = append(os.Environ(),
+			"AZURE_CONFIG_DIR="+azureConfigDir,
+			"AZURE_CORE_LOGIN_EXPERIENCE_V2=off",
+		)
 
 		// Set BROWSER env var to use the configured browser profile
 		if browser != nil {
@@ -591,45 +593,242 @@ func getBrowserCommand(cfg *types.BrowserConfig) string {
 }
 
 // switchKubernetes switches the kubectl context.
-func switchKubernetes(cfg *types.KubernetesConfig) error {
+func switchKubernetes(cfg *types.KubernetesConfig, ctx *types.ContextConfig, mgr *config.Manager) error {
 	// Check if kubectl is available
 	if _, err := exec.LookPath("kubectl"); err != nil {
 		// kubectl not available, skip context switch
 		return nil
 	}
 
-	// Build kubectl command
-	args := []string{"config", "use-context", cfg.Context}
-	if cfg.Kubeconfig != "" {
-		args = append([]string{"--kubeconfig", cfg.Kubeconfig}, args...)
+	yellow := color.New(color.FgYellow)
+	green := color.New(color.FgGreen)
+
+	// Expand kubeconfig path if specified
+	kubeconfigPath := cfg.Kubeconfig
+	if kubeconfigPath != "" {
+		kubeconfigPath = expandPath(kubeconfigPath)
+	}
+
+	// Fetch credentials from cloud provider if configured
+	var fetchedContextName string
+	var fetchErr error
+
+	if cfg.AKS != nil {
+		azureConfigDir := ""
+		if ctx.Azure != nil {
+			azureConfigDir = mgr.AzureConfigDir(ctx.Name)
+		}
+		fetchedContextName, fetchErr = fetchAKSCredentials(cfg.AKS, azureConfigDir, kubeconfigPath)
+		if fetchErr != nil {
+			yellow.Fprintf(os.Stderr, "⚠ AKS credential fetch failed: %v\n", fetchErr)
+		} else {
+			green.Fprintf(os.Stderr, "✓ AKS: fetched credentials for cluster '%s'\n", cfg.AKS.Cluster)
+		}
+	} else if cfg.EKS != nil {
+		fetchedContextName, fetchErr = fetchEKSCredentials(cfg.EKS, ctx.AWS, kubeconfigPath)
+		if fetchErr != nil {
+			yellow.Fprintf(os.Stderr, "⚠ EKS credential fetch failed: %v\n", fetchErr)
+		} else {
+			green.Fprintf(os.Stderr, "✓ EKS: fetched credentials for cluster '%s'\n", cfg.EKS.Cluster)
+		}
+	} else if cfg.GKE != nil {
+		gcpConfigDir := ""
+		if ctx.GCP != nil {
+			gcpConfigDir = mgr.GCPConfigDir(ctx.Name)
+		}
+		fetchedContextName, fetchErr = fetchGKECredentials(cfg.GKE, ctx.GCP, gcpConfigDir, kubeconfigPath)
+		if fetchErr != nil {
+			yellow.Fprintf(os.Stderr, "⚠ GKE credential fetch failed: %v\n", fetchErr)
+		} else {
+			green.Fprintf(os.Stderr, "✓ GKE: fetched credentials for cluster '%s'\n", cfg.GKE.Cluster)
+		}
+	}
+
+	// Determine which context name to use
+	contextName := cfg.Context
+	if contextName == "" && fetchedContextName != "" {
+		contextName = fetchedContextName
+	}
+
+	if contextName == "" {
+		return nil
+	}
+
+	// Rename context if user specified a custom name different from auto-generated
+	if cfg.Context != "" && fetchedContextName != "" && cfg.Context != fetchedContextName {
+		if err := renameKubeContext(fetchedContextName, cfg.Context, kubeconfigPath); err != nil {
+			yellow.Fprintf(os.Stderr, "⚠ Failed to rename context to '%s', using '%s'\n", cfg.Context, fetchedContextName)
+			contextName = fetchedContextName
+		}
+	}
+
+	// Build kubectl command to switch context
+	args := []string{"config", "use-context", contextName}
+	if kubeconfigPath != "" {
+		args = append([]string{"--kubeconfig", kubeconfigPath}, args...)
 	}
 
 	cmd := exec.Command("kubectl", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// Context might not exist in kubeconfig - print warning but continue
-		yellow := color.New(color.FgYellow)
-		yellow.Fprintf(os.Stderr, "⚠ kubectl context '%s' not found (will use env vars)\n", cfg.Context)
-		_ = output // Output already shown via stderr
+		yellow.Fprintf(os.Stderr, "⚠ kubectl context '%s' not found (will use env vars)\n", contextName)
+		_ = output
 		return nil
 	}
 
 	// Set namespace if specified
 	if cfg.Namespace != "" {
 		args := []string{"config", "set-context", "--current", "--namespace", cfg.Namespace}
-		if cfg.Kubeconfig != "" {
-			args = append([]string{"--kubeconfig", cfg.Kubeconfig}, args...)
+		if kubeconfigPath != "" {
+			args = append([]string{"--kubeconfig", kubeconfigPath}, args...)
 		}
 
 		cmd := exec.Command("kubectl", args...)
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			yellow := color.New(color.FgYellow)
 			yellow.Fprintf(os.Stderr, "⚠ failed to set namespace '%s'\n", cfg.Namespace)
 		}
 	}
 
 	return nil
+}
+
+// fetchAKSCredentials runs az aks get-credentials and returns the generated context name.
+func fetchAKSCredentials(aks *types.AKSConfig, azureConfigDir, kubeconfig string) (string, error) {
+	if _, err := exec.LookPath("az"); err != nil {
+		return "", fmt.Errorf("az CLI not found in PATH")
+	}
+
+	if aks.Cluster == "" || aks.ResourceGroup == "" {
+		return "", fmt.Errorf("aks.cluster and aks.resource_group are required")
+	}
+
+	args := []string{
+		"aks", "get-credentials",
+		"--resource-group", aks.ResourceGroup,
+		"--name", aks.Cluster,
+		"--overwrite-existing",
+	}
+
+	if kubeconfig != "" {
+		args = append(args, "--file", kubeconfig)
+	}
+
+	cmd := exec.Command("az", args...)
+	if azureConfigDir != "" {
+		cmd.Env = append(os.Environ(), "AZURE_CONFIG_DIR="+azureConfigDir)
+	}
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("az aks get-credentials failed: %w", err)
+	}
+
+	return aks.Cluster, nil
+}
+
+// fetchEKSCredentials runs aws eks update-kubeconfig and returns the generated context name.
+func fetchEKSCredentials(eks *types.EKSConfig, aws *types.AWSConfig, kubeconfig string) (string, error) {
+	if _, err := exec.LookPath("aws"); err != nil {
+		return "", fmt.Errorf("aws CLI not found in PATH")
+	}
+
+	if eks.Cluster == "" {
+		return "", fmt.Errorf("eks.cluster is required")
+	}
+
+	region := eks.Region
+	if region == "" && aws != nil {
+		region = aws.Region
+	}
+	if region == "" {
+		return "", fmt.Errorf("region required for EKS (set eks.region or aws.region)")
+	}
+
+	args := []string{
+		"eks", "update-kubeconfig",
+		"--name", eks.Cluster,
+		"--region", region,
+	}
+
+	if kubeconfig != "" {
+		args = append(args, "--kubeconfig", kubeconfig)
+	}
+
+	if aws != nil && aws.Profile != "" {
+		args = append(args, "--profile", aws.Profile)
+	}
+
+	cmd := exec.Command("aws", args...)
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("aws eks update-kubeconfig failed: %w", err)
+	}
+
+	return "", nil
+}
+
+// fetchGKECredentials runs gcloud container clusters get-credentials and returns the generated context name.
+func fetchGKECredentials(gke *types.GKEConfig, gcp *types.GCPConfig, gcpConfigDir, kubeconfig string) (string, error) {
+	if _, err := exec.LookPath("gcloud"); err != nil {
+		return "", fmt.Errorf("gcloud CLI not found in PATH")
+	}
+
+	if gke.Cluster == "" {
+		return "", fmt.Errorf("gke.cluster is required")
+	}
+
+	project := gke.Project
+	if project == "" && gcp != nil {
+		project = gcp.Project
+	}
+	if project == "" {
+		return "", fmt.Errorf("project required for GKE (set gke.project or gcp.project)")
+	}
+
+	args := []string{
+		"container", "clusters", "get-credentials",
+		gke.Cluster,
+		"--project", project,
+	}
+
+	location := ""
+	if gke.Zone != "" {
+		args = append(args, "--zone", gke.Zone)
+		location = gke.Zone
+	} else if gke.Region != "" {
+		args = append(args, "--region", gke.Region)
+		location = gke.Region
+	} else {
+		return "", fmt.Errorf("gke.zone or gke.region is required")
+	}
+
+	cmd := exec.Command("gcloud", args...)
+	env := os.Environ()
+	if gcpConfigDir != "" {
+		env = append(env, "CLOUDSDK_CONFIG="+gcpConfigDir)
+	}
+	if kubeconfig != "" {
+		env = append(env, "KUBECONFIG="+kubeconfig)
+	}
+	cmd.Env = env
+	cmd.Stderr = os.Stderr
+
+	if err := cmd.Run(); err != nil {
+		return "", fmt.Errorf("gcloud get-credentials failed: %w", err)
+	}
+
+	return fmt.Sprintf("gke_%s_%s_%s", project, location, gke.Cluster), nil
+}
+
+// renameKubeContext renames a kubectl context.
+func renameKubeContext(oldName, newName, kubeconfig string) error {
+	args := []string{"config", "rename-context", oldName, newName}
+	if kubeconfig != "" {
+		args = append([]string{"--kubeconfig", kubeconfig}, args...)
+	}
+	return exec.Command("kubectl", args...).Run()
 }
 
 // printSwitchSuccess prints a success message after switching contexts.
