@@ -34,7 +34,7 @@ Output columns:
 
 - `NAME` - Context name (abstract contexts prefixed with `~`)
 - `ENVIRONMENT` - Environment type
-- `CLOUD` - Configured cloud providers
+- `CLOUD` - Cloud providers (auto-detected from `aws`, `gcp`, `azure` configs + custom `cloud` label)
 - `ORCHESTRATION` - Configured orchestrators
 
 ### `ctx use <name>`
