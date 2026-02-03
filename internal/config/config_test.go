@@ -319,6 +319,60 @@ func TestManager_GenerateEnvVars(t *testing.T) {
 	}
 }
 
+func TestManager_GenerateEnvVars_Kubernetes(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := NewManagerWithDir(tmpDir)
+
+	ctx := &ContextConfig{
+		Name:        "k8s-test",
+		Environment: EnvDevelopment,
+		Kubernetes: &KubernetesConfig{
+			Context:    "my-cluster",
+			Namespace:  "default",
+			Kubeconfig: "/path/to/kubeconfig",
+		},
+	}
+
+	envVars := m.GenerateEnvVars(ctx)
+
+	// Check KUBECONFIG is set
+	if envVars["KUBECONFIG"] != "/path/to/kubeconfig" {
+		t.Errorf("envVars[KUBECONFIG] = %v, want /path/to/kubeconfig", envVars["KUBECONFIG"])
+	}
+
+	// Test with ~ expansion
+	ctx2 := &ContextConfig{
+		Name:        "k8s-test-home",
+		Environment: EnvDevelopment,
+		Kubernetes: &KubernetesConfig{
+			Kubeconfig: "~/.kube/custom-config",
+		},
+	}
+
+	envVars2 := m.GenerateEnvVars(ctx2)
+
+	// KUBECONFIG should be expanded (not start with ~)
+	if envVars2["KUBECONFIG"] == "~/.kube/custom-config" {
+		t.Errorf("envVars[KUBECONFIG] = %v, expected ~ to be expanded", envVars2["KUBECONFIG"])
+	}
+
+	// Test without kubeconfig - should not set KUBECONFIG
+	ctx3 := &ContextConfig{
+		Name:        "k8s-test-no-config",
+		Environment: EnvDevelopment,
+		Kubernetes: &KubernetesConfig{
+			Context:   "my-cluster",
+			Namespace: "default",
+		},
+	}
+
+	envVars3 := m.GenerateEnvVars(ctx3)
+
+	if _, exists := envVars3["KUBECONFIG"]; exists {
+		t.Errorf("envVars[KUBECONFIG] should not be set when kubeconfig is empty")
+	}
+}
+
 func TestManager_WriteEnvFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	m := NewManagerWithDir(tmpDir)

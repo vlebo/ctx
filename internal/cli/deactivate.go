@@ -95,6 +95,8 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 			"CLOUDSDK_CONFIG", "CLOUDSDK_ACTIVE_CONFIG_NAME", "CLOUDSDK_CORE_PROJECT", "GOOGLE_CLOUD_PROJECT",
 			// Azure
 			"AZURE_CONFIG_DIR", "AZURE_SUBSCRIPTION_ID",
+			// Kubernetes
+			"KUBECONFIG",
 			// Nomad
 			"NOMAD_ADDR", "NOMAD_NAMESPACE", "NOMAD_SKIP_VERIFY",
 			// Consul

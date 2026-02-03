@@ -426,6 +426,13 @@ func (m *Manager) GenerateEnvVars(ctx *ContextConfig) map[string]string {
 		}
 	}
 
+	// Kubernetes
+	if ctx.Kubernetes != nil {
+		if ctx.Kubernetes.Kubeconfig != "" {
+			envVars["KUBECONFIG"] = expandPath(ctx.Kubernetes.Kubeconfig)
+		}
+	}
+
 	// Nomad
 	if ctx.Nomad != nil {
 		if ctx.Nomad.Address != "" {
@@ -538,6 +545,17 @@ func (m *Manager) GenerateEnvVars(ctx *ContextConfig) map[string]string {
 	envVars["CTX_ENVIRONMENT"] = string(ctx.Environment)
 
 	return envVars
+}
+
+// expandPath expands ~ to home directory in paths.
+func expandPath(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			return filepath.Join(home, path[2:])
+		}
+	}
+	return path
 }
 
 // ClearCurrentContext clears the current context.

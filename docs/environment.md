@@ -42,6 +42,14 @@ See [GCP Provider](cloud/gcp.md) for details.
 
 See [Azure Provider](cloud/azure.md) for details.
 
+## Kubernetes
+
+| Variable | Description |
+|----------|-------------|
+| `KUBECONFIG` | Path to kubeconfig file (when `kubernetes.kubeconfig` is set) |
+
+When you specify a custom kubeconfig path in your context, it's automatically exported so kubectl and other tools use it.
+
 ## HashiCorp Tools
 
 | Variable | Description |
