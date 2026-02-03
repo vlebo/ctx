@@ -12,6 +12,7 @@ Complete reference for all context configuration options.
 | `extends` | string | Parent context name to inherit from |
 | `abstract` | bool | If true, context cannot be used directly |
 | `env_color` | string | Prompt color: `red`, `yellow`, `green`, `blue`, `cyan`, `magenta`, `white` |
+| `cloud` | string | Cloud provider label for platforms without native integration (e.g., `digitalocean`, `huawei`, `otc`). Shows in CLOUD column alongside auto-detected providers. Useful for identifying where your Kubernetes cluster is hosted when using non-major cloud providers. |
 | `tags` | []string | Tags for filtering and organization |
 
 ## AWS

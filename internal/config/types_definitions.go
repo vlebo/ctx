@@ -319,6 +319,7 @@ type ContextConfig struct {
 	Description string            `yaml:"description" mapstructure:"description"`
 	Environment Environment       `yaml:"environment" mapstructure:"environment"`
 	EnvColor    string            `yaml:"env_color,omitempty" mapstructure:"env_color"` // red, yellow, green, blue, cyan, magenta, white
+	Cloud       string            `yaml:"cloud,omitempty" mapstructure:"cloud"`         // Custom cloud provider label (e.g., digitalocean, huawei)
 	Tags        []string          `yaml:"tags" mapstructure:"tags"`
 	Tunnels     []TunnelConfig    `yaml:"tunnels,omitempty" mapstructure:"tunnels"`
 	// Databases
@@ -329,6 +330,11 @@ type ContextConfig struct {
 // GetCloudProviders returns a list of configured cloud providers.
 func (c *ContextConfig) GetCloudProviders() []string {
 	var providers []string
+	// Add custom cloud label first if set
+	if c.Cloud != "" {
+		providers = append(providers, c.Cloud)
+	}
+	// Auto-detect configured providers
 	if c.AWS != nil {
 		providers = append(providers, "aws")
 	}

@@ -55,6 +55,31 @@ func TestContextConfig_GetCloudProviders(t *testing.T) {
 			ctx:  &ContextConfig{},
 			want: nil,
 		},
+		{
+			name: "custom cloud only",
+			ctx: &ContextConfig{
+				Cloud: "digitalocean",
+			},
+			want: []string{"digitalocean"},
+		},
+		{
+			name: "custom cloud with aws",
+			ctx: &ContextConfig{
+				Cloud: "digitalocean",
+				AWS:   &AWSConfig{Profile: "test"},
+			},
+			want: []string{"digitalocean", "aws"},
+		},
+		{
+			name: "custom cloud with all providers",
+			ctx: &ContextConfig{
+				Cloud: "huawei",
+				AWS:   &AWSConfig{Profile: "test"},
+				GCP:   &GCPConfig{Project: "test"},
+				Azure: &AzureConfig{SubscriptionID: "test"},
+			},
+			want: []string{"huawei", "aws", "gcp", "azure"},
+		},
 	}
 
 	for _, tt := range tests {
