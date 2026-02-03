@@ -55,7 +55,7 @@ See [Azure Provider](../cloud/azure.md) for details.
 kubernetes:
   context: string           # kubectl context name (optional if using cloud auto-fetch)
   namespace: string         # Default namespace
-  kubeconfig: string        # Path to kubeconfig file (optional)
+  kubeconfig: string        # Path to kubeconfig file (sets KUBECONFIG env var)
 
   # Auto-fetch credentials from cloud providers (mutually exclusive)
   aks:                      # Azure Kubernetes Service
@@ -72,6 +72,8 @@ kubernetes:
     region: string          # Cluster region (for regional clusters)
     project: string         # GCP project (optional, falls back to gcp.project)
 ```
+
+When `kubeconfig` is specified, the `KUBECONFIG` environment variable is automatically set so kubectl and other Kubernetes tools use the correct config file. This is useful when you have separate kubeconfig files per cloud provider to avoid context name conflicts.
 
 When `aks`, `eks`, or `gke` is configured, ctx will automatically fetch credentials using the respective cloud CLI before switching kubectl context.
 
