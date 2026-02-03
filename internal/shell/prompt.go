@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"text/template"
 
-	"github.com/vlebo/ctx/pkg/types"
+	"github.com/vlebo/ctx/internal/config"
 )
 
 // PromptData holds data for prompt rendering.
@@ -20,7 +20,7 @@ type PromptData struct {
 }
 
 // FormatPrompt formats the context name according to the prompt format template.
-func FormatPrompt(format string, ctx *types.ContextConfig) (string, error) {
+func FormatPrompt(format string, ctx *config.ContextConfig) (string, error) {
 	if ctx == nil {
 		return "", nil
 	}

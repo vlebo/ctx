@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Vedran Lebo <vedran@flyingpenguin.tech>
 // SPDX-License-Identifier: MIT
 
-package types
+package config
 
 import (
 	"testing"

@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Vedran Lebo <vedran@flyingpenguin.tech>
 // SPDX-License-Identifier: MIT
 
-// Package types contains shared type definitions for the ctx CLI tool.
-package types
+// Package config contains shared configuration type definitions for the ctx CLI tool.
+package config
 
 import (
 	"maps"
@@ -467,6 +467,7 @@ func NewDeactivateConfigDefaults() *DeactivateConfig {
 // AppConfig represents the main application configuration.
 type AppConfig struct {
 	Deactivate       *DeactivateConfig `yaml:"deactivate,omitempty" mapstructure:"deactivate"`
+	Cloud            *CloudConfig      `yaml:"cloud,omitempty" mapstructure:"cloud"`
 	DefaultContext   string            `yaml:"default_context" mapstructure:"default_context"`
 	PromptFormat     string            `yaml:"prompt_format" mapstructure:"prompt_format"`
 	TunnelsDir       string            `yaml:"tunnels_dir" mapstructure:"tunnels_dir"`
@@ -474,4 +475,13 @@ type AppConfig struct {
 	Version          int               `yaml:"version" mapstructure:"version"`
 	ShellIntegration bool              `yaml:"shell_integration" mapstructure:"shell_integration"`
 	AutoDeactivate   bool              `yaml:"auto_deactivate" mapstructure:"auto_deactivate"`
+}
+
+// CloudConfig holds ctx-cloud integration settings.
+type CloudConfig struct {
+	ServerURL         string `yaml:"server_url" mapstructure:"server_url"`                 // URL of the ctx-cloud server
+	Enabled           bool   `yaml:"enabled" mapstructure:"enabled"`                       // Enable cloud integration
+	SendAuditEvents   bool   `yaml:"send_audit_events" mapstructure:"send_audit_events"`   // Send audit events to cloud
+	SendHeartbeat     bool   `yaml:"send_heartbeat" mapstructure:"send_heartbeat"`         // Send heartbeat to cloud
+	HeartbeatInterval int    `yaml:"heartbeat_interval" mapstructure:"heartbeat_interval"` // Heartbeat interval in seconds (default: 30)
 }

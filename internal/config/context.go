@@ -6,14 +6,12 @@ package config
 import (
 	"fmt"
 	"strings"
-
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 // ContextSummary provides a summary of a context for display purposes.
 type ContextSummary struct {
 	Name          string
-	Environment   types.Environment
+	Environment   Environment
 	CloudProvider string
 	Orchestration string
 	Extras        string
@@ -21,7 +19,7 @@ type ContextSummary struct {
 }
 
 // GetContextSummary returns a summary of a context for display in lists.
-func GetContextSummary(ctx *types.ContextConfig, currentName string) ContextSummary {
+func GetContextSummary(ctx *ContextConfig, currentName string) ContextSummary {
 	return ContextSummary{
 		Name:          ctx.Name,
 		Environment:   ctx.Environment,
@@ -33,7 +31,7 @@ func GetContextSummary(ctx *types.ContextConfig, currentName string) ContextSumm
 }
 
 // FormatContextDetails formats a context configuration for detailed display.
-func FormatContextDetails(ctx *types.ContextConfig) string {
+func FormatContextDetails(ctx *ContextConfig) string {
 	var sb strings.Builder
 
 	sb.WriteString(fmt.Sprintf("Name: %s\n", ctx.Name))
@@ -91,6 +89,7 @@ func FormatContextDetails(ctx *types.ContextConfig) string {
 			if ctx.Kubernetes.Kubeconfig != "" {
 				sb.WriteString(fmt.Sprintf("  Kubeconfig: %s\n", ctx.Kubernetes.Kubeconfig))
 			}
+			// Show cloud-specific config
 			if ctx.Kubernetes.AKS != nil {
 				sb.WriteString(fmt.Sprintf("  AKS Cluster: %s (resource group: %s)\n",
 					ctx.Kubernetes.AKS.Cluster, ctx.Kubernetes.AKS.ResourceGroup))
@@ -100,7 +99,11 @@ func FormatContextDetails(ctx *types.ContextConfig) string {
 				if region == "" && ctx.AWS != nil {
 					region = ctx.AWS.Region
 				}
-				sb.WriteString(fmt.Sprintf("  EKS Cluster: %s (region: %s)\n", ctx.Kubernetes.EKS.Cluster, region))
+				sb.WriteString(fmt.Sprintf("  EKS Cluster: %s", ctx.Kubernetes.EKS.Cluster))
+				if region != "" {
+					sb.WriteString(fmt.Sprintf(" (region: %s)", region))
+				}
+				sb.WriteString("\n")
 			}
 			if ctx.Kubernetes.GKE != nil {
 				location := ctx.Kubernetes.GKE.Zone
@@ -111,7 +114,14 @@ func FormatContextDetails(ctx *types.ContextConfig) string {
 				if project == "" && ctx.GCP != nil {
 					project = ctx.GCP.Project
 				}
-				sb.WriteString(fmt.Sprintf("  GKE Cluster: %s (%s, project: %s)\n", ctx.Kubernetes.GKE.Cluster, location, project))
+				sb.WriteString(fmt.Sprintf("  GKE Cluster: %s", ctx.Kubernetes.GKE.Cluster))
+				if location != "" {
+					sb.WriteString(fmt.Sprintf(" (%s)", location))
+				}
+				if project != "" {
+					sb.WriteString(fmt.Sprintf(" [project: %s]", project))
+				}
+				sb.WriteString("\n")
 			}
 		}
 		if ctx.Nomad != nil {
@@ -315,7 +325,7 @@ func FormatContextDetails(ctx *types.ContextConfig) string {
 }
 
 // ValidateContext validates a context configuration.
-func ValidateContext(ctx *types.ContextConfig) error {
+func ValidateContext(ctx *ContextConfig) error {
 	if ctx.Name == "" {
 		return fmt.Errorf("context name is required")
 	}
@@ -368,6 +378,9 @@ func ValidateContext(ctx *types.ContextConfig) error {
 			}
 			if ctx.Kubernetes.GKE.Zone == "" && ctx.Kubernetes.GKE.Region == "" {
 				return fmt.Errorf("kubernetes.gke requires either zone or region")
+			}
+			if ctx.Kubernetes.GKE.Zone != "" && ctx.Kubernetes.GKE.Region != "" {
+				return fmt.Errorf("kubernetes.gke: specify zone OR region, not both")
 			}
 		}
 		if cloudConfigs > 1 {

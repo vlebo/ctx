@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/vlebo/ctx/internal/config"
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 func TestSwitchContext(t *testing.T) {
@@ -18,10 +17,10 @@ func TestSwitchContext(t *testing.T) {
 	mgr := config.NewManagerWithDir(tmpDir)
 
 	// Create a test context
-	ctx := &types.ContextConfig{
+	ctx := &config.ContextConfig{
 		Name:        "test-context",
 		Description: "Test Description",
-		Environment: types.EnvDevelopment,
+		Environment: config.EnvDevelopment,
 		Env: map[string]string{
 			"TEST_VAR": "test_value",
 		},
@@ -61,10 +60,10 @@ func TestSwitchContext_WithAWS(t *testing.T) {
 	tmpDir := t.TempDir()
 	mgr := config.NewManagerWithDir(tmpDir)
 
-	ctx := &types.ContextConfig{
+	ctx := &config.ContextConfig{
 		Name:        "aws-test",
-		Environment: types.EnvDevelopment,
-		AWS: &types.AWSConfig{
+		Environment: config.EnvDevelopment,
+		AWS: &config.AWSConfig{
 			Profile: "test-profile",
 			Region:  "us-east-1",
 		},
@@ -95,10 +94,10 @@ func TestSwitchContext_WithGCP(t *testing.T) {
 	tmpDir := t.TempDir()
 	mgr := config.NewManagerWithDir(tmpDir)
 
-	ctx := &types.ContextConfig{
+	ctx := &config.ContextConfig{
 		Name:        "gcp-test",
-		Environment: types.EnvDevelopment,
-		GCP: &types.GCPConfig{
+		Environment: config.EnvDevelopment,
+		GCP: &config.GCPConfig{
 			Project:    "test-project",
 			Region:     "us-central1",
 			ConfigName: "test-config",
@@ -130,14 +129,14 @@ func TestSwitchContext_WithNomadConsul(t *testing.T) {
 	tmpDir := t.TempDir()
 	mgr := config.NewManagerWithDir(tmpDir)
 
-	ctx := &types.ContextConfig{
+	ctx := &config.ContextConfig{
 		Name:        "nomad-test",
-		Environment: types.EnvDevelopment,
-		Nomad: &types.NomadConfig{
+		Environment: config.EnvDevelopment,
+		Nomad: &config.NomadConfig{
 			Address:   "http://nomad:4646",
 			Namespace: "default",
 		},
-		Consul: &types.ConsulConfig{
+		Consul: &config.ConsulConfig{
 			Address: "http://consul:8500",
 		},
 	}
@@ -167,7 +166,7 @@ func TestSwitchAWS_WithVault_MissingBinary(t *testing.T) {
 	tmpDir := t.TempDir()
 	mgr := config.NewManagerWithDir(tmpDir)
 
-	cfg := &types.AWSConfig{
+	cfg := &config.AWSConfig{
 		Profile:  "test",
 		UseVault: true,
 	}
@@ -184,7 +183,7 @@ func TestSwitchAWS_WithoutVault(t *testing.T) {
 	tmpDir := t.TempDir()
 	mgr := config.NewManagerWithDir(tmpDir)
 
-	cfg := &types.AWSConfig{
+	cfg := &config.AWSConfig{
 		Profile:  "test",
 		UseVault: false,
 	}

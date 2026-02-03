@@ -12,7 +12,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/vlebo/ctx/internal/config"
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 var (
@@ -51,6 +50,7 @@ forwarding for tunnel access to remote services.`,
 	rootCmd.AddCommand(newBrowserCmd())
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newShellHookCmd())
+	rootCmd.AddCommand(newCloudCmd())
 
 	return rootCmd
 }
@@ -106,7 +106,7 @@ func runRoot(cmd *cobra.Command, args []string) error {
 }
 
 // getEnvColor returns the color for the environment display.
-func getEnvColor(ctx *types.ContextConfig) *color.Color {
+func getEnvColor(ctx *config.ContextConfig) *color.Color {
 	// Use custom color if specified
 	if ctx.EnvColor != "" {
 		switch strings.ToLower(ctx.EnvColor) {
@@ -144,7 +144,7 @@ func getEnvColor(ctx *types.ContextConfig) *color.Color {
 }
 
 // printCurrentContext displays the current context information.
-func printCurrentContext(ctx *types.ContextConfig) {
+func printCurrentContext(ctx *config.ContextConfig) {
 	// Get color based on env_color or fall back to defaults
 	envColor := getEnvColor(ctx)
 

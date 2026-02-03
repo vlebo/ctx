@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/vlebo/ctx/pkg/types"
+	"github.com/vlebo/ctx/internal/config"
 )
 
 func TestExpandPath(t *testing.T) {
@@ -42,7 +42,7 @@ func TestSwitchVPN_NilConfig(t *testing.T) {
 }
 
 func TestSwitchVPN_UnsupportedType(t *testing.T) {
-	cfg := &types.VPNConfig{
+	cfg := &config.VPNConfig{
 		Type: "unsupported",
 	}
 
@@ -53,8 +53,8 @@ func TestSwitchVPN_UnsupportedType(t *testing.T) {
 }
 
 func TestSwitchVPN_CustomWithoutCmd(t *testing.T) {
-	cfg := &types.VPNConfig{
-		Type: types.VPNTypeCustom,
+	cfg := &config.VPNConfig{
+		Type: config.VPNTypeCustom,
 	}
 
 	err := switchVPN(cfg)
@@ -99,8 +99,8 @@ func TestDisconnectVPN_NilConfig(t *testing.T) {
 }
 
 func TestSwitchOpenVPN_NoConfigFile(t *testing.T) {
-	cfg := &types.VPNConfig{
-		Type: types.VPNTypeOpenVPN,
+	cfg := &config.VPNConfig{
+		Type: config.VPNTypeOpenVPN,
 	}
 
 	err := switchOpenVPN(cfg)
@@ -110,8 +110,8 @@ func TestSwitchOpenVPN_NoConfigFile(t *testing.T) {
 }
 
 func TestSwitchWireGuard_NoInterface(t *testing.T) {
-	cfg := &types.VPNConfig{
-		Type: types.VPNTypeWireGuard,
+	cfg := &config.VPNConfig{
+		Type: config.VPNTypeWireGuard,
 	}
 
 	err := switchWireGuard(cfg)

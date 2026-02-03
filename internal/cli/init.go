@@ -10,8 +10,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/vlebo/ctx/internal/config"
 	"github.com/vlebo/ctx/internal/shell"
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 func newInitCmd() *cobra.Command {
@@ -38,7 +38,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 	// Create default config if it doesn't exist
 	if _, err := mgr.LoadAppConfig(); err != nil {
 		// Create default config
-		config := &types.AppConfig{
+		config := &config.AppConfig{
 			Version:          1,
 			ShellIntegration: true,
 			PromptFormat:     "[ctx: {{.Name}}{{if .IsProd}} ⚠️{{end}}]",
@@ -148,7 +148,7 @@ func runShellHook(shellFlag string) error {
 	// Load app config for prompt format
 	appConfig, err := mgr.LoadAppConfig()
 	if err != nil {
-		appConfig = &types.AppConfig{
+		appConfig = &config.AppConfig{
 			PromptFormat: "[ctx: {{.Name}}{{if .IsProd}} ⚠️{{end}}]",
 		}
 	}

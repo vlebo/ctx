@@ -10,7 +10,6 @@ import (
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 	"github.com/vlebo/ctx/internal/config"
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 var listAllFlag bool
@@ -104,7 +103,7 @@ func runList(cmd *cobra.Command, args []string) error {
 }
 
 // formatEnvironmentWithColor returns a colored string for the environment.
-func formatEnvironmentWithColor(ctx *types.ContextConfig) string {
+func formatEnvironmentWithColor(ctx *config.ContextConfig) string {
 	c := getEnvColor(ctx)
 	return c.Sprint(string(ctx.Environment))
 }

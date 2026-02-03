@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vlebo/ctx/pkg/types"
+	"github.com/vlebo/ctx/internal/config"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/agent"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -22,13 +22,13 @@ import (
 type Connection struct {
 	connectedAt time.Time
 	lastError   error
-	config      *types.SSHConfig
+	config      *config.SSHConfig
 	client      *ssh.Client
 	connected   bool
 }
 
 // NewConnection creates a new SSH connection manager.
-func NewConnection(cfg *types.SSHConfig) *Connection {
+func NewConnection(cfg *config.SSHConfig) *Connection {
 	return &Connection{
 		config: cfg,
 	}

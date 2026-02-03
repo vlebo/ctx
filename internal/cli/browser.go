@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vlebo/ctx/pkg/types"
+	"github.com/vlebo/ctx/internal/config"
 	"gopkg.in/ini.v1"
 )
 
@@ -354,16 +354,16 @@ func getFirefoxCommand() string {
 
 // OpenURL opens a URL in the browser configured for the context.
 // If no browser is configured, uses the system default browser.
-func OpenURL(cfg *types.BrowserConfig, url string) error {
+func OpenURL(cfg *config.BrowserConfig, url string) error {
 	if cfg == nil {
 		// No browser config, use system default
 		return openURLDefault(url)
 	}
 
 	switch cfg.Type {
-	case types.BrowserChrome:
+	case config.BrowserChrome:
 		return openURLChrome(cfg.Profile, url)
-	case types.BrowserFirefox:
+	case config.BrowserFirefox:
 		return openURLFirefox(cfg.Profile, url)
 	default:
 		return openURLDefault(url)
@@ -421,15 +421,15 @@ func openURLFirefox(profileName, url string) error {
 }
 
 // OpenBrowser opens the browser with the context's configured profile (no URL).
-func OpenBrowser(cfg *types.BrowserConfig) error {
+func OpenBrowser(cfg *config.BrowserConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("no browser configured for this context")
 	}
 
 	switch cfg.Type {
-	case types.BrowserChrome:
+	case config.BrowserChrome:
 		return openURLChrome(cfg.Profile, "")
-	case types.BrowserFirefox:
+	case config.BrowserFirefox:
 		return openURLFirefox(cfg.Profile, "")
 	default:
 		return fmt.Errorf("unsupported browser type: %s", cfg.Type)

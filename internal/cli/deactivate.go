@@ -14,8 +14,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/vlebo/ctx/internal/cloud"
 	"github.com/vlebo/ctx/internal/config"
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 var deactivateExportFlag bool
@@ -130,6 +130,9 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 		fmt.Fprintf(os.Stderr, "Warning: failed to clear state files: %v\n", err)
 	}
 
+	// Send cloud deactivation event and stop heartbeat
+	sendCloudDeactivateEvents(mgr, currentContext)
+
 	yellow := color.New(color.FgYellow)
 	green := color.New(color.FgGreen)
 	red := color.New(color.FgRed)
@@ -188,9 +191,9 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 
 // getDeactivateConfig returns the effective deactivate config.
 // Context config overrides global config, with defaults if neither is set.
-func getDeactivateConfig(mgr *config.Manager, ctx *types.ContextConfig) *types.DeactivateConfig {
+func getDeactivateConfig(mgr *config.Manager, ctx *config.ContextConfig) *config.DeactivateConfig {
 	// Start with defaults
-	cfg := types.NewDeactivateConfigDefaults()
+	cfg := config.NewDeactivateConfigDefaults()
 
 	// Apply global config if set
 	appConfig := mgr.GetAppConfig()
@@ -248,4 +251,38 @@ func stopContextTunnels(stateDir, contextName string) (int, error) {
 	os.Remove(stateFile)
 
 	return stoppedCount, nil
+}
+
+// sendCloudDeactivateEvents sends deactivation event and stops heartbeat.
+// Errors are logged but do not fail the deactivation.
+func sendCloudDeactivateEvents(mgr *config.Manager, contextName string) {
+	client := NewCloudClient(mgr)
+	if client == nil {
+		return // Cloud integration not configured
+	}
+
+	appConfig := mgr.GetAppConfig()
+	if appConfig == nil || appConfig.Cloud == nil {
+		return
+	}
+
+	// Stop heartbeat
+	hbMgr := cloud.NewHeartbeatManager(mgr.StateDir())
+	hbMgr.StopHeartbeat()
+
+	// Send deactivation audit event (synchronous - must complete before exit)
+	if appConfig.Cloud.SendAuditEvents {
+		event := &cloud.AuditEvent{
+			Action:      "deactivate",
+			ContextName: contextName,
+			Success:     true,
+		}
+		if err := client.SendAuditEvent(event); err != nil {
+			yellow := color.New(color.FgYellow)
+			yellow.Fprintf(os.Stderr, "⚠ Cloud audit event failed: %v\n", err)
+		}
+	}
+
+	// Notify cloud server to deactivate session
+	_ = client.Deactivate(contextName)
 }

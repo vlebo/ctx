@@ -13,13 +13,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/vlebo/ctx/pkg/types"
+	"github.com/vlebo/ctx/internal/config"
 )
 
 // Manager manages multiple SSH tunnels for a context.
 type Manager struct {
 	ctx       context.Context
-	sshConfig *types.SSHConfig
+	sshConfig *config.SSHConfig
 
 	conn    *Connection
 	tunnels map[string]*Tunnel
@@ -28,7 +28,7 @@ type Manager struct {
 	contextName string
 	stateDir    string
 
-	tunnelDefs        []types.TunnelConfig
+	tunnelDefs        []config.TunnelConfig
 	wg                sync.WaitGroup
 	reconnectInterval time.Duration
 	maxReconnectDelay time.Duration
@@ -40,10 +40,10 @@ type Manager struct {
 
 // ManagerConfig holds configuration for the tunnel manager.
 type ManagerConfig struct {
-	SSHConfig         *types.SSHConfig
+	SSHConfig         *config.SSHConfig
 	ContextName       string
 	StateDir          string
-	TunnelDefs        []types.TunnelConfig
+	TunnelDefs        []config.TunnelConfig
 	ReconnectInterval time.Duration
 	MaxReconnectDelay time.Duration
 	ReconnectEnabled  bool
@@ -120,7 +120,7 @@ func (m *Manager) StartTunnel(name string) error {
 	defer m.mu.Unlock()
 
 	// Find the tunnel definition
-	var tunnelDef *types.TunnelConfig
+	var tunnelDef *config.TunnelConfig
 	for _, def := range m.tunnelDefs {
 		if def.Name == name {
 			tunnelDef = &def
