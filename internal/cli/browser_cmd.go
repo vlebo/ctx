@@ -9,7 +9,7 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
-	"github.com/vlebo/ctx/pkg/types"
+	"github.com/vlebo/ctx/internal/config"
 )
 
 func newBrowserCmd() *cobra.Command {
@@ -144,11 +144,11 @@ func runBrowserOpen(cmd *cobra.Command, args []string) error {
 }
 
 // openWithProfile opens a browser with the specified profile.
-func openWithProfile(cfg *types.BrowserConfig, url string) error {
+func openWithProfile(cfg *config.BrowserConfig, url string) error {
 	switch cfg.Type {
-	case types.BrowserChrome:
+	case config.BrowserChrome:
 		return openURLChrome(cfg.Profile, url)
-	case types.BrowserFirefox:
+	case config.BrowserFirefox:
 		return openURLFirefox(cfg.Profile, url)
 	default:
 		return fmt.Errorf("unsupported browser type: %s", cfg.Type)

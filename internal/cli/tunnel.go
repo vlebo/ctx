@@ -17,8 +17,8 @@ import (
 	"github.com/fatih/color"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+	"github.com/vlebo/ctx/internal/cloud"
 	"github.com/vlebo/ctx/internal/config"
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 var tunnelBackground bool
@@ -152,7 +152,7 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine which tunnels to start
-	var tunnelsToStart []types.TunnelConfig
+	var tunnelsToStart []config.TunnelConfig
 	if len(args) > 0 {
 		// Start specific tunnel
 		tunnelName := args[0]
@@ -208,6 +208,7 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 	green := color.New(color.FgGreen)
 	yellow := color.New(color.FgYellow)
 	startedCount := 0
+	var startedTunnels []string
 
 	for _, t := range tunnelsToStart {
 		// Check if this tunnel is already running
@@ -226,7 +227,7 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 		tunnelConfig.LocalPort = actualPort
 
 		// Build SSH args for this single tunnel
-		sshArgs := buildSSHArgs(ctx.SSH, []types.TunnelConfig{tunnelConfig})
+		sshArgs := buildSSHArgs(ctx.SSH, []config.TunnelConfig{tunnelConfig})
 
 		// Start SSH process in background
 		sshCmd := exec.Command("ssh", sshArgs...)
@@ -268,6 +269,7 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 			Config:    tunnelConfig,
 		}
 		startedCount++
+		startedTunnels = append(startedTunnels, t.Name)
 
 		green.Print("✓ ")
 		if portChanged {
@@ -285,6 +287,8 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 
 	if startedCount > 0 {
 		fmt.Printf("\n%d tunnel(s) started.\n", startedCount)
+		// Send tunnel.up audit event
+		sendTunnelEvent(mgr, ctx.Name, string(ctx.Environment), "tunnel.up", startedTunnels, true)
 	}
 	fmt.Println("Use 'ctx tunnel status' to check status.")
 	fmt.Println("Use 'ctx tunnel down [name]' to stop tunnels.")
@@ -293,7 +297,7 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 }
 
 // buildSSHArgs builds the SSH command arguments for port forwarding.
-func buildSSHArgs(sshConfig *types.SSHConfig, tunnels []types.TunnelConfig) []string {
+func buildSSHArgs(sshConfig *config.SSHConfig, tunnels []config.TunnelConfig) []string {
 	args := []string{
 		"-N", // No remote command
 		"-o", "ExitOnForwardFailure=yes",
@@ -339,15 +343,15 @@ type tunnelState struct {
 	StartedAt   time.Time              `json:"started_at"`            // Deprecated
 	TunnelPIDs  map[string]tunnelEntry `json:"tunnel_pids,omitempty"` // New: per-tunnel PIDs
 	ContextName string                 `json:"context_name"`
-	Tunnels     []types.TunnelConfig   `json:"tunnels,omitempty"` // Deprecated
+	Tunnels     []config.TunnelConfig  `json:"tunnels,omitempty"` // Deprecated
 	PID         int                    `json:"pid,omitempty"`     // Deprecated: for backwards compat
 }
 
 // tunnelEntry represents a single running tunnel.
 type tunnelEntry struct {
-	StartedAt time.Time          `json:"started_at"`
-	Config    types.TunnelConfig `json:"config"`
-	PID       int                `json:"pid"`
+	StartedAt time.Time           `json:"started_at"`
+	Config    config.TunnelConfig `json:"config"`
+	PID       int                 `json:"pid"`
 }
 
 func loadTunnelState(path string) (*tunnelState, error) {
@@ -496,16 +500,18 @@ func runTunnelDown(cmd *cobra.Command, args []string) error {
 		fmt.Println("No active tunnels to stop.")
 	} else {
 		fmt.Printf("\n%d tunnel(s) stopped.\n", stoppedCount)
+		// Send tunnel.down audit event
+		sendTunnelEvent(mgr, ctx.Name, string(ctx.Environment), "tunnel.down", tunnelsToStop, true)
 	}
 
 	return nil
 }
 
 // startAutoConnectTunnels starts tunnels that have auto_connect enabled.
-// Called during context switch.
-func startAutoConnectTunnels(mgr *config.Manager, ctx *types.ContextConfig) error {
+// Called during context switch. Returns the list of successfully started tunnel names.
+func startAutoConnectTunnels(mgr *config.Manager, ctx *config.ContextConfig) ([]string, error) {
 	// Filter tunnels with auto_connect
-	var autoConnectTunnels []types.TunnelConfig
+	var autoConnectTunnels []config.TunnelConfig
 	for _, t := range ctx.Tunnels {
 		if t.AutoConnect {
 			autoConnectTunnels = append(autoConnectTunnels, t)
@@ -513,13 +519,13 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *types.ContextConfig) erro
 	}
 
 	if len(autoConnectTunnels) == 0 {
-		return nil
+		return nil, nil
 	}
 
 	// Get state directory
 	stateDir := filepath.Join(mgr.StateDir(), "tunnels")
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
-		return fmt.Errorf("failed to create state directory: %w", err)
+		return nil, fmt.Errorf("failed to create state directory: %w", err)
 	}
 
 	// Load existing state
@@ -538,6 +544,7 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *types.ContextConfig) erro
 	yellow := color.New(color.FgYellow)
 	green := color.New(color.FgGreen)
 	startedCount := 0
+	var startedTunnels []string
 
 	for _, t := range autoConnectTunnels {
 		// Check if this tunnel is already running
@@ -555,7 +562,7 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *types.ContextConfig) erro
 		tunnelConfig.LocalPort = actualPort
 
 		// Build SSH args for this single tunnel
-		sshArgs := buildSSHArgs(ctx.SSH, []types.TunnelConfig{tunnelConfig})
+		sshArgs := buildSSHArgs(ctx.SSH, []config.TunnelConfig{tunnelConfig})
 
 		// Start SSH process in background
 		sshCmd := exec.Command("ssh", sshArgs...)
@@ -595,6 +602,7 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *types.ContextConfig) erro
 			Config:    tunnelConfig,
 		}
 		startedCount++
+		startedTunnels = append(startedTunnels, t.Name)
 
 		if portChanged {
 			green.Fprintf(os.Stderr, "✓ Tunnel %s: localhost:%d → %s:%d ", t.Name, actualPort, t.RemoteHost, t.RemotePort)
@@ -609,7 +617,7 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *types.ContextConfig) erro
 		fmt.Fprintf(os.Stderr, "Warning: failed to save state: %v\n", err)
 	}
 
-	return nil
+	return startedTunnels, nil
 }
 
 func runTunnelStatus(cmd *cobra.Command, args []string) error {
@@ -725,4 +733,25 @@ func runTunnelStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("\nLog file: %s\n", logFile)
 
 	return nil
+}
+
+// sendTunnelEvent sends a tunnel audit event to the cloud server.
+func sendTunnelEvent(mgr *config.Manager, contextName, environment, action string, tunnelNames []string, success bool) {
+	client := NewCloudClient(mgr)
+	if client == nil {
+		return
+	}
+
+	details := map[string]interface{}{
+		"tunnels": tunnelNames,
+	}
+
+	event := &cloud.AuditEvent{
+		Action:      action,
+		ContextName: contextName,
+		Environment: environment,
+		Details:     details,
+		Success:     success,
+	}
+	_ = client.SendAuditEvent(event)
 }

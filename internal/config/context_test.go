@@ -6,16 +6,14 @@ package config
 import (
 	"strings"
 	"testing"
-
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 func TestGetContextSummary(t *testing.T) {
-	ctx := &types.ContextConfig{
+	ctx := &ContextConfig{
 		Name:        "test-context",
-		Environment: types.EnvProduction,
-		AWS:         &types.AWSConfig{Profile: "test"},
-		Kubernetes:  &types.KubernetesConfig{Context: "k8s-ctx"},
+		Environment: EnvProduction,
+		AWS:         &AWSConfig{Profile: "test"},
+		Kubernetes:  &KubernetesConfig{Context: "k8s-ctx"},
 	}
 
 	// Test when context is current
@@ -26,8 +24,8 @@ func TestGetContextSummary(t *testing.T) {
 	if summary.Name != "test-context" {
 		t.Errorf("Name = %v, want %v", summary.Name, "test-context")
 	}
-	if summary.Environment != types.EnvProduction {
-		t.Errorf("Environment = %v, want %v", summary.Environment, types.EnvProduction)
+	if summary.Environment != EnvProduction {
+		t.Errorf("Environment = %v, want %v", summary.Environment, EnvProduction)
 	}
 	if summary.CloudProvider != "aws" {
 		t.Errorf("CloudProvider = %v, want %v", summary.CloudProvider, "aws")
@@ -44,41 +42,41 @@ func TestGetContextSummary(t *testing.T) {
 }
 
 func TestFormatContextDetails(t *testing.T) {
-	ctx := &types.ContextConfig{
+	ctx := &ContextConfig{
 		Name:        "test-context",
 		Description: "Test Description",
-		Environment: types.EnvProduction,
+		Environment: EnvProduction,
 		Tags:        []string{"tag1", "tag2"},
-		AWS: &types.AWSConfig{
+		AWS: &AWSConfig{
 			Profile:  "aws-profile",
 			Region:   "us-west-2",
 			UseVault: true,
 		},
-		GCP: &types.GCPConfig{
+		GCP: &GCPConfig{
 			Project:    "gcp-project",
 			Region:     "us-central1",
 			ConfigName: "gcp-config",
 		},
-		Kubernetes: &types.KubernetesConfig{
+		Kubernetes: &KubernetesConfig{
 			Context:   "k8s-context",
 			Namespace: "default",
 		},
-		Nomad: &types.NomadConfig{
+		Nomad: &NomadConfig{
 			Address:   "http://nomad:4646",
 			Namespace: "default",
 		},
-		Consul: &types.ConsulConfig{
+		Consul: &ConsulConfig{
 			Address: "http://consul:8500",
 		},
-		SSH: &types.SSHConfig{
-			Bastion: types.BastionConfig{
+		SSH: &SSHConfig{
+			Bastion: BastionConfig{
 				Host:         "bastion.example.com",
 				User:         "admin",
 				Port:         22,
 				IdentityFile: "~/.ssh/id_rsa",
 			},
 		},
-		Tunnels: []types.TunnelConfig{
+		Tunnels: []TunnelConfig{
 			{
 				Name:        "postgres",
 				Description: "PostgreSQL",
@@ -128,29 +126,29 @@ func TestFormatContextDetails(t *testing.T) {
 func TestValidateContext(t *testing.T) {
 	tests := []struct {
 		name    string
-		ctx     *types.ContextConfig
+		ctx     *ContextConfig
 		wantErr bool
 		errMsg  string
 	}{
 		{
 			name:    "valid context",
-			ctx:     &types.ContextConfig{Name: "test", Environment: types.EnvDevelopment},
+			ctx:     &ContextConfig{Name: "test", Environment: EnvDevelopment},
 			wantErr: false,
 		},
 		{
 			name:    "missing name",
-			ctx:     &types.ContextConfig{Environment: types.EnvDevelopment},
+			ctx:     &ContextConfig{Environment: EnvDevelopment},
 			wantErr: true,
 			errMsg:  "context name is required",
 		},
 		{
 			name: "valid tunnel config",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				SSH: &types.SSHConfig{
-					Bastion: types.BastionConfig{Host: "bastion.example.com"},
+				SSH: &SSHConfig{
+					Bastion: BastionConfig{Host: "bastion.example.com"},
 				},
-				Tunnels: []types.TunnelConfig{
+				Tunnels: []TunnelConfig{
 					{
 						Name:       "postgres",
 						RemoteHost: "postgres.internal",
@@ -163,12 +161,12 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "tunnel without name",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				SSH: &types.SSHConfig{
-					Bastion: types.BastionConfig{Host: "bastion.example.com"},
+				SSH: &SSHConfig{
+					Bastion: BastionConfig{Host: "bastion.example.com"},
 				},
-				Tunnels: []types.TunnelConfig{
+				Tunnels: []TunnelConfig{
 					{
 						RemoteHost: "postgres.internal",
 						RemotePort: 5432,
@@ -181,12 +179,12 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "tunnel without remote host",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				SSH: &types.SSHConfig{
-					Bastion: types.BastionConfig{Host: "bastion.example.com"},
+				SSH: &SSHConfig{
+					Bastion: BastionConfig{Host: "bastion.example.com"},
 				},
-				Tunnels: []types.TunnelConfig{
+				Tunnels: []TunnelConfig{
 					{
 						Name:       "postgres",
 						RemotePort: 5432,
@@ -199,12 +197,12 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "invalid remote port",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				SSH: &types.SSHConfig{
-					Bastion: types.BastionConfig{Host: "bastion.example.com"},
+				SSH: &SSHConfig{
+					Bastion: BastionConfig{Host: "bastion.example.com"},
 				},
-				Tunnels: []types.TunnelConfig{
+				Tunnels: []TunnelConfig{
 					{
 						Name:       "postgres",
 						RemoteHost: "postgres.internal",
@@ -218,12 +216,12 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "invalid local port",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				SSH: &types.SSHConfig{
-					Bastion: types.BastionConfig{Host: "bastion.example.com"},
+				SSH: &SSHConfig{
+					Bastion: BastionConfig{Host: "bastion.example.com"},
 				},
-				Tunnels: []types.TunnelConfig{
+				Tunnels: []TunnelConfig{
 					{
 						Name:       "postgres",
 						RemoteHost: "postgres.internal",
@@ -237,9 +235,9 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "tunnel without bastion",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				Tunnels: []types.TunnelConfig{
+				Tunnels: []TunnelConfig{
 					{
 						Name:       "postgres",
 						RemoteHost: "postgres.internal",
@@ -253,10 +251,10 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "valid AKS config",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				Kubernetes: &types.KubernetesConfig{
-					AKS: &types.AKSConfig{
+				Kubernetes: &KubernetesConfig{
+					AKS: &AKSConfig{
 						Cluster:       "my-cluster",
 						ResourceGroup: "my-rg",
 					},
@@ -266,10 +264,10 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "AKS missing cluster",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				Kubernetes: &types.KubernetesConfig{
-					AKS: &types.AKSConfig{
+				Kubernetes: &KubernetesConfig{
+					AKS: &AKSConfig{
 						ResourceGroup: "my-rg",
 					},
 				},
@@ -279,10 +277,10 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "AKS missing resource group",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				Kubernetes: &types.KubernetesConfig{
-					AKS: &types.AKSConfig{
+				Kubernetes: &KubernetesConfig{
+					AKS: &AKSConfig{
 						Cluster: "my-cluster",
 					},
 				},
@@ -292,10 +290,10 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "valid EKS config",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				Kubernetes: &types.KubernetesConfig{
-					EKS: &types.EKSConfig{
+				Kubernetes: &KubernetesConfig{
+					EKS: &EKSConfig{
 						Cluster: "my-cluster",
 						Region:  "us-east-1",
 					},
@@ -305,10 +303,10 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "EKS missing cluster",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				Kubernetes: &types.KubernetesConfig{
-					EKS: &types.EKSConfig{
+				Kubernetes: &KubernetesConfig{
+					EKS: &EKSConfig{
 						Region: "us-east-1",
 					},
 				},
@@ -318,10 +316,10 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "valid GKE config with zone",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				Kubernetes: &types.KubernetesConfig{
-					GKE: &types.GKEConfig{
+				Kubernetes: &KubernetesConfig{
+					GKE: &GKEConfig{
 						Cluster: "my-cluster",
 						Zone:    "us-central1-a",
 						Project: "my-project",
@@ -332,10 +330,10 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "GKE missing cluster",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				Kubernetes: &types.KubernetesConfig{
-					GKE: &types.GKEConfig{
+				Kubernetes: &KubernetesConfig{
+					GKE: &GKEConfig{
 						Zone:    "us-central1-a",
 						Project: "my-project",
 					},
@@ -346,10 +344,10 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "GKE missing zone and region",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				Kubernetes: &types.KubernetesConfig{
-					GKE: &types.GKEConfig{
+				Kubernetes: &KubernetesConfig{
+					GKE: &GKEConfig{
 						Cluster: "my-cluster",
 						Project: "my-project",
 					},
@@ -360,14 +358,14 @@ func TestValidateContext(t *testing.T) {
 		},
 		{
 			name: "multiple cloud k8s providers",
-			ctx: &types.ContextConfig{
+			ctx: &ContextConfig{
 				Name: "test",
-				Kubernetes: &types.KubernetesConfig{
-					AKS: &types.AKSConfig{
+				Kubernetes: &KubernetesConfig{
+					AKS: &AKSConfig{
 						Cluster:       "aks-cluster",
 						ResourceGroup: "my-rg",
 					},
-					EKS: &types.EKSConfig{
+					EKS: &EKSConfig{
 						Cluster: "eks-cluster",
 					},
 				},

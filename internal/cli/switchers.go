@@ -12,30 +12,29 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/vlebo/ctx/internal/config"
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 // switchVPN connects to VPN based on configuration.
-func switchVPN(cfg *types.VPNConfig) error {
+func switchVPN(cfg *config.VPNConfig) error {
 	if cfg == nil {
 		return nil
 	}
 
 	switch cfg.Type {
-	case types.VPNTypeOpenVPN:
+	case config.VPNTypeOpenVPN:
 		return switchOpenVPN(cfg)
-	case types.VPNTypeWireGuard:
+	case config.VPNTypeWireGuard:
 		return switchWireGuard(cfg)
-	case types.VPNTypeTailscale:
+	case config.VPNTypeTailscale:
 		return switchTailscale(cfg)
-	case types.VPNTypeCustom:
+	case config.VPNTypeCustom:
 		return switchCustomVPN(cfg)
 	default:
 		return fmt.Errorf("unsupported VPN type: %s", cfg.Type)
 	}
 }
 
-func switchOpenVPN(cfg *types.VPNConfig) error {
+func switchOpenVPN(cfg *config.VPNConfig) error {
 	if cfg.ConfigFile == "" {
 		return fmt.Errorf("openvpn config_file is required")
 	}
@@ -79,7 +78,8 @@ func switchOpenVPN(cfg *types.VPNConfig) error {
 		)
 	} else {
 		yellow.Fprintln(os.Stderr, "⚠ No DNS update script found. VPN DNS resolution may not work.")
-		yellow.Fprintln(os.Stderr, "  Install 'openvpn-systemd-resolved' or configure VPN in NetworkManager.")
+		yellow.Fprintln(os.Stderr, "  Install 'openvpn-systemd-resolved' or 'openvpn' package with update scripts,")
+		yellow.Fprintln(os.Stderr, "  or use NetworkManager: remove openvpn from PATH and configure VPN in NetworkManager.")
 	}
 
 	yellow.Println("⚠ OpenVPN requires sudo. You may be prompted for your password.")
@@ -91,17 +91,23 @@ func switchOpenVPN(cfg *types.VPNConfig) error {
 }
 
 // findDNSUpdateScript looks for common OpenVPN DNS update scripts.
+// Returns the script path and a boolean indicating if DNS will be handled.
 func findDNSUpdateScript() string {
+	// Common locations for DNS update scripts across platforms
 	scripts := []string{
-		// Linux - systemd-resolved (preferred)
+		// Linux - systemd-resolved (preferred on modern systems)
 		"/etc/openvpn/update-systemd-resolved",
 		"/usr/share/openvpn/update-systemd-resolved",
+		"/usr/local/share/openvpn/update-systemd-resolved",
 		// Linux - resolvconf
 		"/etc/openvpn/update-resolv-conf",
 		"/usr/share/openvpn/update-resolv-conf",
-		// macOS - Homebrew
+		"/usr/local/share/openvpn/update-resolv-conf",
+		// macOS - Homebrew locations
 		"/opt/homebrew/etc/openvpn/update-resolv-conf",
 		"/usr/local/etc/openvpn/update-resolv-conf",
+		"/opt/homebrew/share/openvpn/update-resolv-conf",
+		"/usr/local/share/openvpn/update-resolv-conf",
 	}
 
 	for _, script := range scripts {
@@ -112,7 +118,7 @@ func findDNSUpdateScript() string {
 	return ""
 }
 
-func switchWireGuard(cfg *types.VPNConfig) error {
+func switchWireGuard(cfg *config.VPNConfig) error {
 	if cfg.Interface == "" {
 		return fmt.Errorf("wireguard interface is required")
 	}
@@ -141,7 +147,7 @@ func switchWireGuard(cfg *types.VPNConfig) error {
 	return fmt.Errorf("neither wg-quick nor nmcli found in PATH")
 }
 
-func switchTailscale(cfg *types.VPNConfig) error {
+func switchTailscale(cfg *config.VPNConfig) error {
 	if _, err := exec.LookPath("tailscale"); err != nil {
 		return fmt.Errorf("tailscale command not found in PATH")
 	}
@@ -166,7 +172,7 @@ func switchTailscale(cfg *types.VPNConfig) error {
 	return nil
 }
 
-func switchCustomVPN(cfg *types.VPNConfig) error {
+func switchCustomVPN(cfg *config.VPNConfig) error {
 	if cfg.ConnectCmd == "" {
 		return fmt.Errorf("custom VPN connect_cmd is required")
 	}
@@ -178,13 +184,13 @@ func switchCustomVPN(cfg *types.VPNConfig) error {
 }
 
 // disconnectVPN disconnects from VPN.
-func disconnectVPN(cfg *types.VPNConfig) error {
+func disconnectVPN(cfg *config.VPNConfig) error {
 	if cfg == nil {
 		return nil
 	}
 
 	switch cfg.Type {
-	case types.VPNTypeOpenVPN:
+	case config.VPNTypeOpenVPN:
 		// Find and kill only the openvpn process for this specific config
 		cmd := exec.Command("pgrep", "-a", "openvpn")
 		output, _ := cmd.Output()
@@ -213,12 +219,12 @@ func disconnectVPN(cfg *types.VPNConfig) error {
 			return nil
 		}
 		return nil
-	case types.VPNTypeWireGuard:
+	case config.VPNTypeWireGuard:
 		if _, err := exec.LookPath("wg-quick"); err == nil {
 			return exec.Command("sudo", "wg-quick", "down", cfg.Interface).Run()
 		}
 		return exec.Command("nmcli", "connection", "down", cfg.Interface).Run()
-	case types.VPNTypeTailscale:
+	case config.VPNTypeTailscale:
 		// Try without sudo first, then with sudo
 		cmd := exec.Command("tailscale", "down")
 		if err := cmd.Run(); err != nil {
@@ -227,7 +233,7 @@ func disconnectVPN(cfg *types.VPNConfig) error {
 			cmd.Run() // Ignore errors - might already be disconnected
 		}
 		return nil
-	case types.VPNTypeCustom:
+	case config.VPNTypeCustom:
 		if cfg.DisconnectCmd != "" {
 			return exec.Command("sh", "-c", cfg.DisconnectCmd).Run()
 		}
@@ -237,7 +243,7 @@ func disconnectVPN(cfg *types.VPNConfig) error {
 }
 
 // switchVault configures HashiCorp Vault environment.
-func switchVault(cfg *types.VaultConfig, browser *types.BrowserConfig, mgr *config.Manager, contextName string) error {
+func switchVault(cfg *config.VaultConfig, browser *config.BrowserConfig, mgr *config.Manager, contextName string) error {
 	if cfg == nil {
 		return nil
 	}
@@ -264,7 +270,7 @@ func switchVault(cfg *types.VaultConfig, browser *types.BrowserConfig, mgr *conf
 	}
 
 	// If OIDC auth is specified and auto_login is enabled, trigger a login
-	if cfg.AuthMethod == types.VaultAuthOIDC && cfg.AutoLogin {
+	if cfg.AuthMethod == config.VaultAuthOIDC && cfg.AutoLogin {
 		if browser != nil {
 			yellow.Printf("• Vault OIDC login - opening %s profile '%s'...\n", browser.Type, browser.Profile)
 		} else {
@@ -308,7 +314,7 @@ func switchVault(cfg *types.VaultConfig, browser *types.BrowserConfig, mgr *conf
 }
 
 // verifyVaultToken checks if a Vault token is still valid.
-func verifyVaultToken(cfg *types.VaultConfig, token string) bool {
+func verifyVaultToken(cfg *config.VaultConfig, token string) bool {
 	cmd := exec.Command("vault", "token", "lookup", "-format=json")
 	cmd.Env = append(os.Environ(),
 		"VAULT_ADDR="+cfg.Address,
@@ -323,7 +329,7 @@ func verifyVaultToken(cfg *types.VaultConfig, token string) bool {
 }
 
 // switchGit configures Git identity for the session.
-func switchGit(cfg *types.GitConfig) error {
+func switchGit(cfg *config.GitConfig) error {
 	if cfg == nil {
 		return nil
 	}
@@ -365,7 +371,7 @@ func switchGit(cfg *types.GitConfig) error {
 }
 
 // switchDocker configures Docker registry and context.
-func switchDocker(cfg *types.DockerRegistryConfig) error {
+func switchDocker(cfg *config.DockerRegistryConfig) error {
 	if cfg == nil {
 		return nil
 	}
@@ -401,7 +407,7 @@ func switchDocker(cfg *types.DockerRegistryConfig) error {
 }
 
 // switchNPM configures NPM registry.
-func switchNPM(cfg *types.NPMConfig) error {
+func switchNPM(cfg *config.NPMConfig) error {
 	if cfg == nil {
 		return nil
 	}
@@ -464,7 +470,7 @@ func expandPath(path string) string {
 
 // checkAnyVPNRunning checks if any VPN (other than the expected one) is running.
 // Returns a description of what's running, or empty string if nothing.
-func checkAnyVPNRunning(expected *types.VPNConfig) string {
+func checkAnyVPNRunning(expected *config.VPNConfig) string {
 	// Check for openvpn processes
 	cmd := exec.Command("pgrep", "-a", "openvpn")
 	if output, err := cmd.Output(); err == nil {
@@ -506,13 +512,13 @@ func checkAnyVPNRunning(expected *types.VPNConfig) string {
 }
 
 // checkVPNStatus checks if the VPN is currently connected.
-func checkVPNStatus(cfg *types.VPNConfig) bool {
+func checkVPNStatus(cfg *config.VPNConfig) bool {
 	if cfg == nil {
 		return false
 	}
 
 	switch cfg.Type {
-	case types.VPNTypeWireGuard:
+	case config.VPNTypeWireGuard:
 		// Check if wireguard interface is up
 		if cfg.Interface != "" {
 			cmd := exec.Command("ip", "link", "show", cfg.Interface)
@@ -520,14 +526,14 @@ func checkVPNStatus(cfg *types.VPNConfig) bool {
 				return true
 			}
 		}
-	case types.VPNTypeTailscale:
+	case config.VPNTypeTailscale:
 		// Check tailscale status
 		cmd := exec.Command("tailscale", "status", "--json")
 		output, err := cmd.Output()
 		if err == nil && strings.Contains(string(output), `"BackendState":"Running"`) {
 			return true
 		}
-	case types.VPNTypeOpenVPN:
+	case config.VPNTypeOpenVPN:
 		// Check if openvpn process is running with this specific config
 		cmd := exec.Command("pgrep", "-a", "openvpn")
 		output, err := cmd.Output()
@@ -547,7 +553,7 @@ func checkVPNStatus(cfg *types.VPNConfig) bool {
 			// No specific config file, any openvpn counts as connected
 			return true
 		}
-	case types.VPNTypeCustom:
+	case config.VPNTypeCustom:
 		if cfg.StatusCmd != "" {
 			cmd := exec.Command("sh", "-c", cfg.StatusCmd)
 			if err := cmd.Run(); err == nil {

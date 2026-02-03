@@ -6,12 +6,12 @@ package ssh
 import (
 	"testing"
 
-	"github.com/vlebo/ctx/pkg/types"
+	"github.com/vlebo/ctx/internal/config"
 )
 
 func TestNewConnection(t *testing.T) {
-	cfg := &types.SSHConfig{
-		Bastion: types.BastionConfig{
+	cfg := &config.SSHConfig{
+		Bastion: config.BastionConfig{
 			Host: "bastion.example.com",
 			User: "testuser",
 			Port: 22,
@@ -34,8 +34,8 @@ func TestNewConnection(t *testing.T) {
 }
 
 func TestConnection_IsConnected_NotConnected(t *testing.T) {
-	cfg := &types.SSHConfig{
-		Bastion: types.BastionConfig{
+	cfg := &config.SSHConfig{
+		Bastion: config.BastionConfig{
 			Host: "bastion.example.com",
 			User: "testuser",
 			Port: 22,
@@ -50,8 +50,8 @@ func TestConnection_IsConnected_NotConnected(t *testing.T) {
 }
 
 func TestConnection_Disconnect_NotConnected(t *testing.T) {
-	cfg := &types.SSHConfig{
-		Bastion: types.BastionConfig{
+	cfg := &config.SSHConfig{
+		Bastion: config.BastionConfig{
 			Host: "bastion.example.com",
 			User: "testuser",
 			Port: 22,

@@ -12,11 +12,12 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/vlebo/ctx/internal/cloud"
 	"github.com/vlebo/ctx/internal/config"
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 var (
@@ -112,7 +113,7 @@ func runUse(cmd *cobra.Command, args []string) error {
 }
 
 // confirmProductionSwitch prompts the user to confirm switching to a production context.
-func confirmProductionSwitch(ctx *types.ContextConfig) bool {
+func confirmProductionSwitch(ctx *config.ContextConfig) bool {
 	warning := color.New(color.FgRed, color.Bold)
 	warning.Printf("⚠️  Switching to PRODUCTION environment: %s\n", ctx.Name)
 	fmt.Print("   Type 'yes' to confirm: ")
@@ -127,7 +128,7 @@ func confirmProductionSwitch(ctx *types.ContextConfig) bool {
 }
 
 // switchContext performs all the operations to switch to a new context.
-func switchContext(mgr *config.Manager, ctx *types.ContextConfig) ([]string, error) {
+func switchContext(mgr *config.Manager, ctx *config.ContextConfig) ([]string, error) {
 	yellow := color.New(color.FgYellow)
 	var failures []string
 
@@ -204,7 +205,7 @@ func switchContext(mgr *config.Manager, ctx *types.ContextConfig) ([]string, err
 
 	// Start auto-connect tunnels
 	if len(ctx.Tunnels) > 0 && ctx.SSH != nil && ctx.SSH.Bastion.Host != "" {
-		if err := startAutoConnectTunnels(mgr, ctx); err != nil {
+		if _, err := startAutoConnectTunnels(mgr, ctx); err != nil {
 			yellow.Fprintf(os.Stderr, "⚠ Tunnel auto-connect failed: %v\n", err)
 		}
 	}
@@ -244,6 +245,8 @@ func switchContext(mgr *config.Manager, ctx *types.ContextConfig) ([]string, err
 	// If there were failures, ask user if they want to continue
 	if len(failures) > 0 {
 		if !confirmContinueWithFailures(failures) {
+			// Send abort event to cloud
+			sendAbortEvent(mgr, ctx, failures)
 			return failures, fmt.Errorf("aborted: %s failed", strings.Join(failures, ", "))
 		}
 	}
@@ -258,7 +261,133 @@ func switchContext(mgr *config.Manager, ctx *types.ContextConfig) ([]string, err
 		return failures, fmt.Errorf("failed to write environment file: %w", err)
 	}
 
+	// Send cloud audit event and start heartbeat (non-blocking, errors are logged)
+	sendCloudEvents(mgr, ctx, failures)
+
 	return failures, nil
+}
+
+// sendCloudEvents sends audit event and starts heartbeat to ctx-cloud.
+// This is non-blocking and errors are logged but do not fail the context switch.
+func sendCloudEvents(mgr *config.Manager, ctx *config.ContextConfig, failures []string) {
+	client := NewCloudClient(mgr)
+	if client == nil {
+		return // Cloud integration not configured
+	}
+
+	appConfig := mgr.GetAppConfig()
+	if appConfig == nil || appConfig.Cloud == nil {
+		return
+	}
+
+	// Determine VPN status and tunnels
+	vpnConnected := false
+	var activeTunnels []string
+
+	if ctx.VPN != nil && !slices.Contains(failures, "VPN") {
+		vpnConnected = checkVPNStatus(ctx.VPN)
+	}
+
+	for _, tunnel := range ctx.Tunnels {
+		if tunnel.AutoConnect {
+			activeTunnels = append(activeTunnels, tunnel.Name)
+		}
+	}
+
+	// Build details for audit event
+	details := make(map[string]interface{})
+	if ctx.AWS != nil {
+		details["aws_profile"] = ctx.AWS.Profile
+		details["aws_region"] = ctx.AWS.Region
+	}
+	if ctx.GCP != nil {
+		details["gcp_project"] = ctx.GCP.Project
+	}
+	if ctx.Kubernetes != nil {
+		details["k8s_context"] = ctx.Kubernetes.Context
+	}
+	if vpnConnected {
+		details["vpn_connected"] = true
+		if ctx.VPN != nil {
+			details["vpn_type"] = string(ctx.VPN.Type)
+		}
+	}
+	if len(activeTunnels) > 0 {
+		details["tunnels"] = activeTunnels
+	}
+	if len(failures) > 0 {
+		details["partial_failures"] = failures
+	}
+
+	// Send switch audit event (async to not block)
+	// VPN and tunnel auto-connects are included in the switch event details,
+	// not as separate events. Manual `ctx vpn connect` and `ctx tunnel up`
+	// commands send their own events.
+	//
+	// Success is true if context was loaded (even with partial failures).
+	// Success is false only if the switch was aborted.
+	if appConfig.Cloud.SendAuditEvents {
+		go func() {
+			event := &cloud.AuditEvent{
+				Action:      "switch",
+				ContextName: ctx.Name,
+				Environment: string(ctx.Environment),
+				Details:     details,
+				Success:     true, // Context was loaded (partial failures are in details)
+			}
+			if err := client.SendAuditEvent(event); err != nil {
+				yellow := color.New(color.FgYellow)
+				yellow.Fprintf(os.Stderr, "⚠ Cloud audit event failed: %v\n", err)
+			}
+		}()
+	}
+
+	// Start heartbeat
+	if appConfig.Cloud.SendHeartbeat {
+		interval := time.Duration(appConfig.Cloud.HeartbeatInterval) * time.Second
+		if interval == 0 {
+			interval = 30 * time.Second
+		}
+
+		hbMgr := cloud.NewHeartbeatManager(mgr.StateDir())
+		if err := hbMgr.StartHeartbeat(client, ctx.Name, string(ctx.Environment), vpnConnected, activeTunnels, interval); err != nil {
+			yellow := color.New(color.FgYellow)
+			yellow.Fprintf(os.Stderr, "⚠ Cloud heartbeat failed: %v\n", err)
+		}
+	}
+}
+
+// sendAbortEvent sends an audit event when the user aborts a context switch due to failures.
+func sendAbortEvent(mgr *config.Manager, ctx *config.ContextConfig, failures []string) {
+	client := NewCloudClient(mgr)
+	if client == nil {
+		return
+	}
+
+	appConfig := mgr.GetAppConfig()
+	if appConfig == nil || appConfig.Cloud == nil || !appConfig.Cloud.SendAuditEvents {
+		return
+	}
+
+	details := map[string]interface{}{
+		"partial_failures": failures,
+		"aborted":          true,
+	}
+
+	event := &cloud.AuditEvent{
+		Action:       "switch",
+		ContextName:  ctx.Name,
+		Environment:  string(ctx.Environment),
+		Details:      details,
+		Success:      false, // Aborted - context was NOT loaded
+		ErrorMessage: fmt.Sprintf("Aborted: %s failed", strings.Join(failures, ", ")),
+	}
+
+	// Send synchronously since we're about to exit anyway
+	if err := client.SendAuditEvent(event); err != nil {
+		yellow := color.New(color.FgYellow)
+		yellow.Fprintf(os.Stderr, "⚠ Cloud audit event failed: %v\n", err)
+	}
 }
 
 // confirmContinueWithFailures asks the user if they want to continue loading the context despite failures.
@@ -278,7 +407,7 @@ func confirmContinueWithFailures(failures []string) bool {
 }
 
 // switchAWS configures AWS environment.
-func switchAWS(cfg *types.AWSConfig, browser *types.BrowserConfig, mgr *config.Manager, contextName string) error {
+func switchAWS(cfg *config.AWSConfig, browser *config.BrowserConfig, mgr *config.Manager, contextName string) error {
 	yellow := color.New(color.FgYellow)
 	green := color.New(color.FgGreen)
 
@@ -374,7 +503,7 @@ func parseAWSVaultOutput(data []byte, creds *config.AWSCredentials) error {
 }
 
 // switchGCP configures GCP environment.
-func switchGCP(cfg *types.GCPConfig, browser *types.BrowserConfig, mgr *config.Manager, contextName string) error {
+func switchGCP(cfg *config.GCPConfig, browser *config.BrowserConfig, mgr *config.Manager, contextName string) error {
 	// Check if gcloud is available
 	if _, err := exec.LookPath("gcloud"); err != nil {
 		// gcloud not available, just set env vars
@@ -458,7 +587,7 @@ func isGCPAuthenticated(configDir string) bool {
 }
 
 // switchAzure configures Azure environment.
-func switchAzure(cfg *types.AzureConfig, browser *types.BrowserConfig, mgr *config.Manager, contextName string) error {
+func switchAzure(cfg *config.AzureConfig, browser *config.BrowserConfig, mgr *config.Manager, contextName string) error {
 	// Check if az CLI is available
 	if _, err := exec.LookPath("az"); err != nil {
 		// az not available, just set env vars
@@ -497,7 +626,7 @@ func switchAzure(cfg *types.AzureConfig, browser *types.BrowserConfig, mgr *conf
 		// Set per-context config directory and disable interactive subscription picker
 		cmd.Env = append(os.Environ(),
 			"AZURE_CONFIG_DIR="+azureConfigDir,
-			"AZURE_CORE_LOGIN_EXPERIENCE_V2=off",
+			"AZURE_CORE_LOGIN_EXPERIENCE_V2=off", // Skip interactive subscription selection
 		)
 
 		// Set BROWSER env var to use the configured browser profile
@@ -549,7 +678,7 @@ func isAzureAuthenticated(configDir string) bool {
 
 // getBrowserCommand returns a path to a wrapper script for opening URLs in the specified browser profile.
 // This is needed because BROWSER env var parsing varies across tools.
-func getBrowserCommand(cfg *types.BrowserConfig) string {
+func getBrowserCommand(cfg *config.BrowserConfig) string {
 	if cfg == nil {
 		return ""
 	}
@@ -558,14 +687,14 @@ func getBrowserCommand(cfg *types.BrowserConfig) string {
 	var args string
 
 	switch cfg.Type {
-	case types.BrowserChrome:
+	case config.BrowserChrome:
 		profileDir, err := findChromeProfileDir(cfg.Profile)
 		if err != nil {
 			return ""
 		}
 		browserCmd = getChromeCommand()
 		args = fmt.Sprintf("--profile-directory=\"%s\"", profileDir)
-	case types.BrowserFirefox:
+	case config.BrowserFirefox:
 		profile, err := findFirefoxProfileName(cfg.Profile)
 		if err != nil {
 			return ""
@@ -592,8 +721,8 @@ func getBrowserCommand(cfg *types.BrowserConfig) string {
 	return tmpFile.Name()
 }
 
-// switchKubernetes switches the kubectl context.
-func switchKubernetes(cfg *types.KubernetesConfig, ctx *types.ContextConfig, mgr *config.Manager) error {
+// switchKubernetes fetches credentials (if cloud config present) and switches the kubectl context.
+func switchKubernetes(cfg *config.KubernetesConfig, ctx *config.ContextConfig, mgr *config.Manager) error {
 	// Check if kubectl is available
 	if _, err := exec.LookPath("kubectl"); err != nil {
 		// kubectl not available, skip context switch
@@ -647,16 +776,19 @@ func switchKubernetes(cfg *types.KubernetesConfig, ctx *types.ContextConfig, mgr
 	// Determine which context name to use
 	contextName := cfg.Context
 	if contextName == "" && fetchedContextName != "" {
+		// No custom context name specified, use the auto-generated one
 		contextName = fetchedContextName
 	}
 
 	if contextName == "" {
+		// No context to switch to
 		return nil
 	}
 
 	// Rename context if user specified a custom name different from auto-generated
 	if cfg.Context != "" && fetchedContextName != "" && cfg.Context != fetchedContextName {
 		if err := renameKubeContext(fetchedContextName, cfg.Context, kubeconfigPath); err != nil {
+			// Rename failed, try to use the auto-generated name
 			yellow.Fprintf(os.Stderr, "⚠ Failed to rename context to '%s', using '%s'\n", cfg.Context, fetchedContextName)
 			contextName = fetchedContextName
 		}
@@ -671,8 +803,9 @@ func switchKubernetes(cfg *types.KubernetesConfig, ctx *types.ContextConfig, mgr
 	cmd := exec.Command("kubectl", args...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
+		// Context might not exist in kubeconfig - print warning but continue
 		yellow.Fprintf(os.Stderr, "⚠ kubectl context '%s' not found (will use env vars)\n", contextName)
-		_ = output
+		_ = output // Output already shown via stderr
 		return nil
 	}
 
@@ -694,13 +827,16 @@ func switchKubernetes(cfg *types.KubernetesConfig, ctx *types.ContextConfig, mgr
 }
 
 // fetchAKSCredentials runs az aks get-credentials and returns the generated context name.
-func fetchAKSCredentials(aks *types.AKSConfig, azureConfigDir, kubeconfig string) (string, error) {
+func fetchAKSCredentials(aks *config.AKSConfig, azureConfigDir, kubeconfig string) (string, error) {
 	if _, err := exec.LookPath("az"); err != nil {
-		return "", fmt.Errorf("az CLI not found in PATH")
+		return "", fmt.Errorf("az CLI is required but not found in PATH")
 	}
 
-	if aks.Cluster == "" || aks.ResourceGroup == "" {
-		return "", fmt.Errorf("aks.cluster and aks.resource_group are required")
+	if aks.Cluster == "" {
+		return "", fmt.Errorf("aks.cluster is required")
+	}
+	if aks.ResourceGroup == "" {
+		return "", fmt.Errorf("aks.resource_group is required")
 	}
 
 	args := []string{
@@ -715,6 +851,7 @@ func fetchAKSCredentials(aks *types.AKSConfig, azureConfigDir, kubeconfig string
 	}
 
 	cmd := exec.Command("az", args...)
+	// Use per-context Azure config for authentication if available
 	if azureConfigDir != "" {
 		cmd.Env = append(os.Environ(), "AZURE_CONFIG_DIR="+azureConfigDir)
 	}
@@ -724,25 +861,27 @@ func fetchAKSCredentials(aks *types.AKSConfig, azureConfigDir, kubeconfig string
 		return "", fmt.Errorf("az aks get-credentials failed: %w", err)
 	}
 
+	// AKS context name format: <cluster-name>
 	return aks.Cluster, nil
 }
 
 // fetchEKSCredentials runs aws eks update-kubeconfig and returns the generated context name.
-func fetchEKSCredentials(eks *types.EKSConfig, aws *types.AWSConfig, kubeconfig string) (string, error) {
+func fetchEKSCredentials(eks *config.EKSConfig, aws *config.AWSConfig, kubeconfig string) (string, error) {
 	if _, err := exec.LookPath("aws"); err != nil {
-		return "", fmt.Errorf("aws CLI not found in PATH")
+		return "", fmt.Errorf("aws CLI is required but not found in PATH")
 	}
 
 	if eks.Cluster == "" {
 		return "", fmt.Errorf("eks.cluster is required")
 	}
 
+	// Determine region: use EKS-specific region, fall back to AWS config region
 	region := eks.Region
 	if region == "" && aws != nil {
 		region = aws.Region
 	}
 	if region == "" {
-		return "", fmt.Errorf("region required for EKS (set eks.region or aws.region)")
+		return "", fmt.Errorf("region is required for EKS (specify in kubernetes.eks.region or aws.region)")
 	}
 
 	args := []string{
@@ -755,6 +894,7 @@ func fetchEKSCredentials(eks *types.EKSConfig, aws *types.AWSConfig, kubeconfig 
 		args = append(args, "--kubeconfig", kubeconfig)
 	}
 
+	// Use AWS profile if configured
 	if aws != nil && aws.Profile != "" {
 		args = append(args, "--profile", aws.Profile)
 	}
@@ -766,25 +906,29 @@ func fetchEKSCredentials(eks *types.EKSConfig, aws *types.AWSConfig, kubeconfig 
 		return "", fmt.Errorf("aws eks update-kubeconfig failed: %w", err)
 	}
 
+	// EKS context name format: arn:aws:eks:<region>:<account>:cluster/<cluster-name>
+	// The actual name depends on the account, so we return an empty string
+	// and let kubectl figure it out from the cluster name
 	return "", nil
 }
 
 // fetchGKECredentials runs gcloud container clusters get-credentials and returns the generated context name.
-func fetchGKECredentials(gke *types.GKEConfig, gcp *types.GCPConfig, gcpConfigDir, kubeconfig string) (string, error) {
+func fetchGKECredentials(gke *config.GKEConfig, gcp *config.GCPConfig, gcpConfigDir, kubeconfig string) (string, error) {
 	if _, err := exec.LookPath("gcloud"); err != nil {
-		return "", fmt.Errorf("gcloud CLI not found in PATH")
+		return "", fmt.Errorf("gcloud CLI is required but not found in PATH")
 	}
 
 	if gke.Cluster == "" {
 		return "", fmt.Errorf("gke.cluster is required")
 	}
 
+	// Determine project: use GKE-specific project, fall back to GCP config project
 	project := gke.Project
 	if project == "" && gcp != nil {
 		project = gcp.Project
 	}
 	if project == "" {
-		return "", fmt.Errorf("project required for GKE (set gke.project or gcp.project)")
+		return "", fmt.Errorf("project is required for GKE (specify in kubernetes.gke.project or gcp.project)")
 	}
 
 	args := []string{
@@ -793,6 +937,7 @@ func fetchGKECredentials(gke *types.GKEConfig, gcp *types.GCPConfig, gcpConfigDi
 		"--project", project,
 	}
 
+	// Zone or region (mutually exclusive)
 	location := ""
 	if gke.Zone != "" {
 		args = append(args, "--zone", gke.Zone)
@@ -801,10 +946,11 @@ func fetchGKECredentials(gke *types.GKEConfig, gcp *types.GCPConfig, gcpConfigDi
 		args = append(args, "--region", gke.Region)
 		location = gke.Region
 	} else {
-		return "", fmt.Errorf("gke.zone or gke.region is required")
+		return "", fmt.Errorf("either gke.zone or gke.region is required")
 	}
 
 	cmd := exec.Command("gcloud", args...)
+	// Use per-context GCP config for authentication if available
 	env := os.Environ()
 	if gcpConfigDir != "" {
 		env = append(env, "CLOUDSDK_CONFIG="+gcpConfigDir)
@@ -816,9 +962,10 @@ func fetchGKECredentials(gke *types.GKEConfig, gcp *types.GCPConfig, gcpConfigDi
 	cmd.Stderr = os.Stderr
 
 	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("gcloud get-credentials failed: %w", err)
+		return "", fmt.Errorf("gcloud container clusters get-credentials failed: %w", err)
 	}
 
+	// GKE context name format: gke_<project>_<zone-or-region>_<cluster>
 	return fmt.Sprintf("gke_%s_%s_%s", project, location, gke.Cluster), nil
 }
 
@@ -828,12 +975,13 @@ func renameKubeContext(oldName, newName, kubeconfig string) error {
 	if kubeconfig != "" {
 		args = append([]string{"--kubeconfig", kubeconfig}, args...)
 	}
-	return exec.Command("kubectl", args...).Run()
+	cmd := exec.Command("kubectl", args...)
+	return cmd.Run()
 }
 
 // printSwitchSuccess prints a success message after switching contexts.
 // Items in the failures list are skipped (no checkmark shown).
-func printSwitchSuccess(ctx *types.ContextConfig, failures []string) {
+func printSwitchSuccess(ctx *config.ContextConfig, failures []string) {
 	green := color.New(color.FgGreen)
 	cyan := color.New(color.FgCyan)
 

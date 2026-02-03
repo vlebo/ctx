@@ -9,6 +9,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/vlebo/ctx/internal/cloud"
+	"github.com/vlebo/ctx/internal/config"
 )
 
 func newLogoutCmd() *cobra.Command {
@@ -162,6 +164,9 @@ func runLogout(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Send cloud events (logout action + deactivate session)
+	sendCloudLogoutEvents(mgr, contextName, string(ctx.Environment))
+
 	fmt.Fprintln(os.Stderr)
 	green.Fprintf(os.Stderr, "✓ Logged out of '%s'.\n", contextName)
 	fmt.Fprintln(os.Stderr, "  You will need to re-authenticate next time you use this context.")
@@ -171,4 +176,28 @@ func runLogout(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// sendCloudLogoutEvents sends logout audit event and deactivates cloud session.
+func sendCloudLogoutEvents(mgr *config.Manager, contextName, environment string) {
+	client := NewCloudClient(mgr)
+	if client == nil {
+		return
+	}
+
+	// Stop heartbeat if running
+	hbMgr := cloud.NewHeartbeatManager(mgr.StateDir())
+	_ = hbMgr.StopHeartbeat()
+
+	// Send logout audit event (synchronous - must complete before exit)
+	event := &cloud.AuditEvent{
+		Action:      "logout",
+		ContextName: contextName,
+		Environment: environment,
+		Success:     true,
+	}
+	_ = client.SendAuditEvent(event)
+
+	// Deactivate cloud session
+	_ = client.Deactivate(contextName)
 }

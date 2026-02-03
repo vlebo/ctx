@@ -6,7 +6,7 @@ package ssh
 import (
 	"testing"
 
-	"github.com/vlebo/ctx/pkg/types"
+	"github.com/vlebo/ctx/internal/config"
 )
 
 func TestTunnelStatus_String(t *testing.T) {
@@ -32,7 +32,7 @@ func TestTunnelStatus_String(t *testing.T) {
 }
 
 func TestNewTunnel(t *testing.T) {
-	cfg := types.TunnelConfig{
+	cfg := config.TunnelConfig{
 		Name:        "test-tunnel",
 		Description: "Test Tunnel",
 		RemoteHost:  "remote.example.com",
@@ -41,8 +41,8 @@ func TestNewTunnel(t *testing.T) {
 	}
 
 	// We can't fully test without an SSH connection, but we can test initialization
-	sshCfg := &types.SSHConfig{
-		Bastion: types.BastionConfig{
+	sshCfg := &config.SSHConfig{
+		Bastion: config.BastionConfig{
 			Host: "bastion.example.com",
 			User: "testuser",
 			Port: 22,
@@ -61,7 +61,7 @@ func TestNewTunnel(t *testing.T) {
 }
 
 func TestTunnel_Info(t *testing.T) {
-	cfg := types.TunnelConfig{
+	cfg := config.TunnelConfig{
 		Name:        "test-tunnel",
 		Description: "Test Tunnel",
 		RemoteHost:  "remote.example.com",
@@ -69,8 +69,8 @@ func TestTunnel_Info(t *testing.T) {
 		LocalPort:   15432,
 	}
 
-	sshCfg := &types.SSHConfig{
-		Bastion: types.BastionConfig{
+	sshCfg := &config.SSHConfig{
+		Bastion: config.BastionConfig{
 			Host: "bastion.example.com",
 			User: "testuser",
 			Port: 22,

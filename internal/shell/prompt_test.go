@@ -8,49 +8,49 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/vlebo/ctx/pkg/types"
+	"github.com/vlebo/ctx/internal/config"
 )
 
 func TestFormatPrompt(t *testing.T) {
 	tests := []struct {
 		name     string
 		format   string
-		ctx      *types.ContextConfig
+		ctx      *config.ContextConfig
 		expected string
 	}{
 		{
 			name:   "simple format",
 			format: "[ctx: {{.Name}}]",
-			ctx: &types.ContextConfig{
+			ctx: &config.ContextConfig{
 				Name:        "my-context",
-				Environment: types.EnvDevelopment,
+				Environment: config.EnvDevelopment,
 			},
 			expected: "[ctx: my-context]",
 		},
 		{
 			name:   "with prod indicator",
 			format: "[ctx: {{.Name}}{{if .IsProd}} ⚠️{{end}}]",
-			ctx: &types.ContextConfig{
+			ctx: &config.ContextConfig{
 				Name:        "prod-context",
-				Environment: types.EnvProduction,
+				Environment: config.EnvProduction,
 			},
 			expected: "[ctx: prod-context ⚠️]",
 		},
 		{
 			name:   "prod indicator not shown for dev",
 			format: "[ctx: {{.Name}}{{if .IsProd}} ⚠️{{end}}]",
-			ctx: &types.ContextConfig{
+			ctx: &config.ContextConfig{
 				Name:        "dev-context",
-				Environment: types.EnvDevelopment,
+				Environment: config.EnvDevelopment,
 			},
 			expected: "[ctx: dev-context]",
 		},
 		{
 			name:   "with environment",
 			format: "[{{.Name}} ({{.Environment}})]",
-			ctx: &types.ContextConfig{
+			ctx: &config.ContextConfig{
 				Name:        "staging",
-				Environment: types.EnvStaging,
+				Environment: config.EnvStaging,
 			},
 			expected: "[staging (staging)]",
 		},
@@ -76,7 +76,7 @@ func TestFormatPrompt(t *testing.T) {
 }
 
 func TestFormatPrompt_InvalidTemplate(t *testing.T) {
-	ctx := &types.ContextConfig{
+	ctx := &config.ContextConfig{
 		Name: "test",
 	}
 

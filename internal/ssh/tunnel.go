@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/vlebo/ctx/pkg/types"
+	"github.com/vlebo/ctx/internal/config"
 )
 
 // TunnelStatus represents the current status of a tunnel.
@@ -53,7 +53,7 @@ type Tunnel struct {
 	ctx         context.Context
 	conn        *Connection
 	cancel      context.CancelFunc
-	config      types.TunnelConfig
+	config      config.TunnelConfig
 	wg          sync.WaitGroup
 	status      TunnelStatus
 	activeConns int64
@@ -61,7 +61,7 @@ type Tunnel struct {
 }
 
 // NewTunnel creates a new tunnel instance.
-func NewTunnel(cfg types.TunnelConfig, conn *Connection) *Tunnel {
+func NewTunnel(cfg config.TunnelConfig, conn *Connection) *Tunnel {
 	return &Tunnel{
 		config: cfg,
 		conn:   conn,
@@ -148,7 +148,7 @@ func (t *Tunnel) ActiveConnections() int64 {
 }
 
 // Config returns the tunnel configuration.
-func (t *Tunnel) Config() types.TunnelConfig {
+func (t *Tunnel) Config() config.TunnelConfig {
 	return t.config
 }
 

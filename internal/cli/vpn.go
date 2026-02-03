@@ -8,6 +8,8 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
+	"github.com/vlebo/ctx/internal/cloud"
+	"github.com/vlebo/ctx/internal/config"
 )
 
 func newVPNCmd() *cobra.Command {
@@ -71,8 +73,13 @@ func runVPNConnect(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Connecting to VPN (%s)...\n", ctx.VPN.Type)
 
 	if err := switchVPN(ctx.VPN); err != nil {
+		// Send failure event
+		sendVPNEvent(mgr, ctx.Name, string(ctx.Environment), "vpn.connect", false, err.Error())
 		return fmt.Errorf("VPN connection failed: %w", err)
 	}
+
+	// Send success event
+	sendVPNEvent(mgr, ctx.Name, string(ctx.Environment), "vpn.connect", true, "")
 
 	green.Printf("✓ VPN connected\n")
 	return nil
@@ -101,8 +108,11 @@ func runVPNDisconnect(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Disconnecting from VPN (%s)...\n", ctx.VPN.Type)
 
 	if err := disconnectVPN(ctx.VPN); err != nil {
+		sendVPNEvent(mgr, ctx.Name, string(ctx.Environment), "vpn.disconnect", false, err.Error())
 		return fmt.Errorf("VPN disconnect failed: %w", err)
 	}
+
+	sendVPNEvent(mgr, ctx.Name, string(ctx.Environment), "vpn.disconnect", true, "")
 
 	yellow.Printf("✓ VPN disconnected\n")
 	return nil
@@ -158,4 +168,21 @@ func runVPNStatus(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+// sendVPNEvent sends a VPN audit event to the cloud server.
+func sendVPNEvent(mgr *config.Manager, contextName, environment, action string, success bool, errMsg string) {
+	client := NewCloudClient(mgr)
+	if client == nil {
+		return
+	}
+
+	event := &cloud.AuditEvent{
+		Action:       action,
+		ContextName:  contextName,
+		Environment:  environment,
+		Success:      success,
+		ErrorMessage: errMsg,
+	}
+	_ = client.SendAuditEvent(event)
 }

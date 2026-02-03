@@ -9,20 +9,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/vlebo/ctx/pkg/types"
+	"github.com/vlebo/ctx/internal/config"
 )
 
 func TestNewManager(t *testing.T) {
 	cfg := ManagerConfig{
 		ContextName: "test-context",
-		SSHConfig: &types.SSHConfig{
-			Bastion: types.BastionConfig{
+		SSHConfig: &config.SSHConfig{
+			Bastion: config.BastionConfig{
 				Host: "bastion.example.com",
 				User: "testuser",
 				Port: 22,
 			},
 		},
-		TunnelDefs: []types.TunnelConfig{
+		TunnelDefs: []config.TunnelConfig{
 			{
 				Name:       "postgres",
 				RemoteHost: "db.internal",
@@ -47,8 +47,8 @@ func TestNewManager(t *testing.T) {
 func TestManager_DefaultReconnectSettings(t *testing.T) {
 	cfg := ManagerConfig{
 		ContextName: "test-context",
-		SSHConfig: &types.SSHConfig{
-			Bastion: types.BastionConfig{
+		SSHConfig: &config.SSHConfig{
+			Bastion: config.BastionConfig{
 				Host: "bastion.example.com",
 				User: "testuser",
 				Port: 22,
@@ -69,8 +69,8 @@ func TestManager_DefaultReconnectSettings(t *testing.T) {
 func TestManager_Status_NoTunnels(t *testing.T) {
 	cfg := ManagerConfig{
 		ContextName: "test-context",
-		SSHConfig: &types.SSHConfig{
-			Bastion: types.BastionConfig{
+		SSHConfig: &config.SSHConfig{
+			Bastion: config.BastionConfig{
 				Host: "bastion.example.com",
 				User: "testuser",
 				Port: 22,

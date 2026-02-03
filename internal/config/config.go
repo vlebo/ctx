@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
-	"github.com/vlebo/ctx/pkg/types"
 	"github.com/zalando/go-keyring"
 	"gopkg.in/yaml.v3"
 )
@@ -42,7 +41,7 @@ const (
 
 // Manager handles configuration operations.
 type Manager struct {
-	appConfig   *types.AppConfig
+	appConfig   *AppConfig
 	configDir   string
 	contextsDir string
 	stateDir    string
@@ -101,7 +100,7 @@ func (m *Manager) EnsureDirs() error {
 }
 
 // LoadAppConfig loads the main application configuration.
-func (m *Manager) LoadAppConfig() (*types.AppConfig, error) {
+func (m *Manager) LoadAppConfig() (*AppConfig, error) {
 	configPath := filepath.Join(m.configDir, ConfigFileName)
 
 	// Check if config file exists
@@ -119,7 +118,7 @@ func (m *Manager) LoadAppConfig() (*types.AppConfig, error) {
 		return nil, fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	config := &types.AppConfig{}
+	config := &AppConfig{}
 	if err := v.Unmarshal(config); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}
@@ -140,7 +139,7 @@ func (m *Manager) LoadAppConfig() (*types.AppConfig, error) {
 }
 
 // SaveAppConfig saves the main application configuration.
-func (m *Manager) SaveAppConfig(config *types.AppConfig) error {
+func (m *Manager) SaveAppConfig(config *AppConfig) error {
 	if err := m.EnsureDirs(); err != nil {
 		return err
 	}
@@ -160,8 +159,8 @@ func (m *Manager) SaveAppConfig(config *types.AppConfig) error {
 }
 
 // defaultAppConfig returns the default application configuration.
-func (m *Manager) defaultAppConfig() *types.AppConfig {
-	return &types.AppConfig{
+func (m *Manager) defaultAppConfig() *AppConfig {
+	return &AppConfig{
 		Version:          1,
 		DefaultContext:   "",
 		ShellIntegration: true,
@@ -172,7 +171,7 @@ func (m *Manager) defaultAppConfig() *types.AppConfig {
 }
 
 // GetAppConfig returns the cached app config, loading it if necessary.
-func (m *Manager) GetAppConfig() *types.AppConfig {
+func (m *Manager) GetAppConfig() *AppConfig {
 	if m.appConfig == nil {
 		m.LoadAppConfig()
 	}
@@ -181,12 +180,12 @@ func (m *Manager) GetAppConfig() *types.AppConfig {
 
 // LoadContext loads a context configuration by name.
 // If the context extends another context, it will be merged with the parent.
-func (m *Manager) LoadContext(name string) (*types.ContextConfig, error) {
+func (m *Manager) LoadContext(name string) (*ContextConfig, error) {
 	return m.loadContextWithChain(name, nil)
 }
 
 // loadContextWithChain loads a context and tracks the inheritance chain to detect cycles.
-func (m *Manager) loadContextWithChain(name string, chain []string) (*types.ContextConfig, error) {
+func (m *Manager) loadContextWithChain(name string, chain []string) (*ContextConfig, error) {
 	// Check for circular dependency
 	if slices.Contains(chain, name) {
 		return nil, fmt.Errorf("circular inheritance detected: %s -> %s", strings.Join(append(chain, name), " -> "), name)
@@ -202,7 +201,7 @@ func (m *Manager) loadContextWithChain(name string, chain []string) (*types.Cont
 		return nil, fmt.Errorf("failed to read context file: %w", err)
 	}
 
-	config := &types.ContextConfig{}
+	config := &ContextConfig{}
 	if err := yaml.Unmarshal(data, config); err != nil {
 		return nil, fmt.Errorf("failed to parse context file: %w", err)
 	}
@@ -220,7 +219,7 @@ func (m *Manager) loadContextWithChain(name string, chain []string) (*types.Cont
 }
 
 // SaveContext saves a context configuration.
-func (m *Manager) SaveContext(config *types.ContextConfig) error {
+func (m *Manager) SaveContext(config *ContextConfig) error {
 	if err := m.EnsureDirs(); err != nil {
 		return err
 	}
@@ -279,13 +278,13 @@ func (m *Manager) ListContexts() ([]string, error) {
 }
 
 // ListContextConfigs returns all context configurations.
-func (m *Manager) ListContextConfigs() ([]*types.ContextConfig, error) {
+func (m *Manager) ListContextConfigs() ([]*ContextConfig, error) {
 	names, err := m.ListContexts()
 	if err != nil {
 		return nil, err
 	}
 
-	var configs []*types.ContextConfig
+	var configs []*ContextConfig
 	for _, name := range names {
 		config, err := m.LoadContext(name)
 		if err != nil {
@@ -334,7 +333,7 @@ func (m *Manager) SetCurrentContext(name string) error {
 }
 
 // GetCurrentContext returns the currently active context configuration.
-func (m *Manager) GetCurrentContext() (*types.ContextConfig, error) {
+func (m *Manager) GetCurrentContext() (*ContextConfig, error) {
 	name, err := m.GetCurrentContextName()
 	if err != nil {
 		return nil, err
@@ -348,12 +347,12 @@ func (m *Manager) GetCurrentContext() (*types.ContextConfig, error) {
 }
 
 // WriteEnvFile writes the environment variables for the current context to a file.
-func (m *Manager) WriteEnvFile(ctx *types.ContextConfig) error {
+func (m *Manager) WriteEnvFile(ctx *ContextConfig) error {
 	return m.WriteEnvFileWithSecrets(ctx, nil)
 }
 
 // WriteEnvFileWithSecrets writes env vars including resolved secrets to a file.
-func (m *Manager) WriteEnvFileWithSecrets(ctx *types.ContextConfig, secrets map[string]string) error {
+func (m *Manager) WriteEnvFileWithSecrets(ctx *ContextConfig, secrets map[string]string) error {
 	if err := m.EnsureDirs(); err != nil {
 		return err
 	}
@@ -377,7 +376,7 @@ func (m *Manager) WriteEnvFileWithSecrets(ctx *types.ContextConfig, secrets map[
 }
 
 // GenerateEnvVars generates environment variables for a context.
-func (m *Manager) GenerateEnvVars(ctx *types.ContextConfig) map[string]string {
+func (m *Manager) GenerateEnvVars(ctx *ContextConfig) map[string]string {
 	envVars := make(map[string]string)
 
 	// AWS
@@ -501,7 +500,7 @@ func (m *Manager) GenerateEnvVars(ctx *types.ContextConfig) map[string]string {
 		// Set the first database as default
 		db := ctx.Databases[0]
 		switch db.Type {
-		case types.DBTypePostgres:
+		case DBTypePostgres:
 			envVars["PGHOST"] = db.Host
 			envVars["PGPORT"] = fmt.Sprintf("%d", db.Port)
 			if db.Database != "" {
@@ -513,7 +512,7 @@ func (m *Manager) GenerateEnvVars(ctx *types.ContextConfig) map[string]string {
 			if db.SSLMode != "" {
 				envVars["PGSSLMODE"] = db.SSLMode
 			}
-		case types.DBTypeMySQL:
+		case DBTypeMySQL:
 			envVars["MYSQL_HOST"] = db.Host
 			envVars["MYSQL_TCP_PORT"] = fmt.Sprintf("%d", db.Port)
 			if db.Database != "" {
@@ -522,10 +521,10 @@ func (m *Manager) GenerateEnvVars(ctx *types.ContextConfig) map[string]string {
 			if db.Username != "" {
 				envVars["MYSQL_USER"] = db.Username
 			}
-		case types.DBTypeRedis:
+		case DBTypeRedis:
 			envVars["REDIS_HOST"] = db.Host
 			envVars["REDIS_PORT"] = fmt.Sprintf("%d", db.Port)
-		case types.DBTypeMongoDB:
+		case DBTypeMongoDB:
 			envVars["MONGODB_HOST"] = db.Host
 			envVars["MONGODB_PORT"] = fmt.Sprintf("%d", db.Port)
 		}
@@ -865,6 +864,76 @@ func (m *Manager) DeleteAWSCredentials(contextName string) error {
 	credPath := filepath.Join(m.TokensDir(), contextName+".aws")
 	if err := os.Remove(credPath); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("failed to delete AWS credentials: %w", err)
+	}
+	return nil
+}
+
+// cloudAPIKeyKey returns the keyring key for the cloud API key.
+func cloudAPIKeyKey() string {
+	return "cloud-api-key"
+}
+
+// SaveCloudAPIKey saves the ctx-cloud API key.
+// It tries to use the system keychain first, falling back to file storage.
+func (m *Manager) SaveCloudAPIKey(apiKey string) error {
+	key := cloudAPIKeyKey()
+
+	// Try keychain first
+	err := keyring.Set(keyringService, key, apiKey)
+	if err == nil {
+		// Successfully stored in keychain, remove any old file-based key
+		keyPath := filepath.Join(m.TokensDir(), "cloud.key")
+		os.Remove(keyPath) // Ignore error - file might not exist
+		return nil
+	}
+
+	// Keychain not available, fall back to file
+	if err := m.EnsureTokensDir(); err != nil {
+		return fmt.Errorf("failed to create tokens directory: %w", err)
+	}
+
+	keyPath := filepath.Join(m.TokensDir(), "cloud.key")
+	// Use restrictive permissions - API keys are sensitive
+	if err := os.WriteFile(keyPath, []byte(apiKey), 0o600); err != nil {
+		return fmt.Errorf("failed to save cloud API key: %w", err)
+	}
+
+	return nil
+}
+
+// LoadCloudAPIKey loads the saved ctx-cloud API key.
+// It tries the system keychain first, falling back to file storage.
+// Returns empty string if no API key is saved.
+func (m *Manager) LoadCloudAPIKey() string {
+	key := cloudAPIKeyKey()
+
+	// Try keychain first
+	apiKey, err := keyring.Get(keyringService, key)
+	if err == nil && apiKey != "" {
+		return apiKey
+	}
+
+	// Fall back to file
+	keyPath := filepath.Join(m.TokensDir(), "cloud.key")
+	data, err := os.ReadFile(keyPath)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+// DeleteCloudAPIKey removes the saved ctx-cloud API key.
+// It removes from both keychain and file storage.
+func (m *Manager) DeleteCloudAPIKey() error {
+	key := cloudAPIKeyKey()
+
+	// Delete from keychain (ignore errors - might not exist)
+	keyring.Delete(keyringService, key)
+
+	// Delete from file
+	keyPath := filepath.Join(m.TokensDir(), "cloud.key")
+	if err := os.Remove(keyPath); err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("failed to delete cloud API key: %w", err)
 	}
 	return nil
 }

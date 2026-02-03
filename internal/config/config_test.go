@@ -7,8 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 func TestNewManagerWithDir(t *testing.T) {
@@ -74,7 +72,7 @@ func TestManager_SaveAndLoadAppConfig(t *testing.T) {
 	tmpDir := t.TempDir()
 	m := NewManagerWithDir(tmpDir)
 
-	config := &types.AppConfig{
+	config := &AppConfig{
 		Version:          1,
 		DefaultContext:   "test-context",
 		ShellIntegration: true,
@@ -102,15 +100,15 @@ func TestManager_SaveAndLoadContext(t *testing.T) {
 	tmpDir := t.TempDir()
 	m := NewManagerWithDir(tmpDir)
 
-	ctx := &types.ContextConfig{
+	ctx := &ContextConfig{
 		Name:        "test-context",
 		Description: "Test Description",
-		Environment: types.EnvDevelopment,
-		AWS: &types.AWSConfig{
+		Environment: EnvDevelopment,
+		AWS: &AWSConfig{
 			Profile: "test-profile",
 			Region:  "us-east-1",
 		},
-		Kubernetes: &types.KubernetesConfig{
+		Kubernetes: &KubernetesConfig{
 			Context:   "test-k8s-context",
 			Namespace: "default",
 		},
@@ -162,10 +160,10 @@ func TestManager_ListContexts(t *testing.T) {
 	m := NewManagerWithDir(tmpDir)
 
 	// Save some test contexts
-	contexts := []*types.ContextConfig{
-		{Name: "context-a", Environment: types.EnvDevelopment},
-		{Name: "context-b", Environment: types.EnvStaging},
-		{Name: "context-c", Environment: types.EnvProduction},
+	contexts := []*ContextConfig{
+		{Name: "context-a", Environment: EnvDevelopment},
+		{Name: "context-b", Environment: EnvStaging},
+		{Name: "context-c", Environment: EnvProduction},
 	}
 
 	for _, ctx := range contexts {
@@ -188,9 +186,9 @@ func TestManager_DeleteContext(t *testing.T) {
 	tmpDir := t.TempDir()
 	m := NewManagerWithDir(tmpDir)
 
-	ctx := &types.ContextConfig{
+	ctx := &ContextConfig{
 		Name:        "to-delete",
-		Environment: types.EnvDevelopment,
+		Environment: EnvDevelopment,
 	}
 
 	err := m.SaveContext(ctx)
@@ -219,9 +217,9 @@ func TestManager_CurrentContext(t *testing.T) {
 	m := NewManagerWithDir(tmpDir)
 
 	// Create a context first
-	ctx := &types.ContextConfig{
+	ctx := &ContextConfig{
 		Name:        "current-test",
-		Environment: types.EnvDevelopment,
+		Environment: EnvDevelopment,
 	}
 	m.SaveContext(ctx)
 
@@ -274,22 +272,22 @@ func TestManager_GenerateEnvVars(t *testing.T) {
 	tmpDir := t.TempDir()
 	m := NewManagerWithDir(tmpDir)
 
-	ctx := &types.ContextConfig{
+	ctx := &ContextConfig{
 		Name:        "env-test",
-		Environment: types.EnvProduction,
-		AWS: &types.AWSConfig{
+		Environment: EnvProduction,
+		AWS: &AWSConfig{
 			Profile: "aws-profile",
 			Region:  "us-west-2",
 		},
-		GCP: &types.GCPConfig{
+		GCP: &GCPConfig{
 			Project:    "gcp-project",
 			ConfigName: "gcp-config",
 		},
-		Nomad: &types.NomadConfig{
+		Nomad: &NomadConfig{
 			Address:   "http://nomad:4646",
 			Namespace: "default",
 		},
-		Consul: &types.ConsulConfig{
+		Consul: &ConsulConfig{
 			Address: "http://consul:8500",
 		},
 		Env: map[string]string{
@@ -325,9 +323,9 @@ func TestManager_WriteEnvFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	m := NewManagerWithDir(tmpDir)
 
-	ctx := &types.ContextConfig{
+	ctx := &ContextConfig{
 		Name:        "env-file-test",
-		Environment: types.EnvDevelopment,
+		Environment: EnvDevelopment,
 		Env: map[string]string{
 			"TEST_VAR": "test_value",
 		},
@@ -355,14 +353,14 @@ func TestManager_LoadContext_Inheritance(t *testing.T) {
 	m := NewManagerWithDir(tmpDir)
 
 	// Create base context
-	base := &types.ContextConfig{
+	base := &ContextConfig{
 		Name:        "base-context",
 		Description: "Base context",
-		Environment: types.EnvDevelopment,
-		AWS: &types.AWSConfig{
+		Environment: EnvDevelopment,
+		AWS: &AWSConfig{
 			Region: "us-east-1",
 		},
-		Kubernetes: &types.KubernetesConfig{
+		Kubernetes: &KubernetesConfig{
 			Context:   "base-k8s",
 			Namespace: "default",
 		},
@@ -379,12 +377,12 @@ func TestManager_LoadContext_Inheritance(t *testing.T) {
 	}
 
 	// Create child context that extends base
-	child := &types.ContextConfig{
+	child := &ContextConfig{
 		Name:        "child-context",
 		Extends:     "base-context",
 		Description: "Child context",
-		Environment: types.EnvProduction,
-		AWS: &types.AWSConfig{
+		Environment: EnvProduction,
+		AWS: &AWSConfig{
 			Profile: "child-profile",
 			Region:  "us-west-2",
 		},
@@ -407,7 +405,7 @@ func TestManager_LoadContext_Inheritance(t *testing.T) {
 	if loaded.Name != "child-context" {
 		t.Errorf("Name = %v, want child-context", loaded.Name)
 	}
-	if loaded.Environment != types.EnvProduction {
+	if loaded.Environment != EnvProduction {
 		t.Errorf("Environment = %v, want production", loaded.Environment)
 	}
 	if loaded.AWS.Region != "us-west-2" {
@@ -442,11 +440,11 @@ func TestManager_LoadContext_CircularInheritance(t *testing.T) {
 	m := NewManagerWithDir(tmpDir)
 
 	// Create circular dependency: A -> B -> A
-	contextA := &types.ContextConfig{
+	contextA := &ContextConfig{
 		Name:    "context-a",
 		Extends: "context-b",
 	}
-	contextB := &types.ContextConfig{
+	contextB := &ContextConfig{
 		Name:    "context-b",
 		Extends: "context-a",
 	}
@@ -469,27 +467,27 @@ func TestManager_LoadContext_MultiLevelInheritance(t *testing.T) {
 	m := NewManagerWithDir(tmpDir)
 
 	// Create: grandparent -> parent -> child
-	grandparent := &types.ContextConfig{
+	grandparent := &ContextConfig{
 		Name:        "grandparent",
-		Environment: types.EnvDevelopment,
-		AWS: &types.AWSConfig{
+		Environment: EnvDevelopment,
+		AWS: &AWSConfig{
 			Region: "us-east-1",
 		},
 		Env: map[string]string{
 			"LEVEL": "grandparent",
 		},
 	}
-	parent := &types.ContextConfig{
+	parent := &ContextConfig{
 		Name:    "parent",
 		Extends: "grandparent",
-		Kubernetes: &types.KubernetesConfig{
+		Kubernetes: &KubernetesConfig{
 			Context: "parent-k8s",
 		},
 	}
-	child := &types.ContextConfig{
+	child := &ContextConfig{
 		Name:        "child",
 		Extends:     "parent",
-		Environment: types.EnvProduction,
+		Environment: EnvProduction,
 	}
 
 	m.SaveContext(grandparent)
@@ -502,7 +500,7 @@ func TestManager_LoadContext_MultiLevelInheritance(t *testing.T) {
 	}
 
 	// Child overrides
-	if loaded.Environment != types.EnvProduction {
+	if loaded.Environment != EnvProduction {
 		t.Errorf("Environment = %v, want production", loaded.Environment)
 	}
 
@@ -524,7 +522,7 @@ func TestManager_LoadContext_ParentNotFound(t *testing.T) {
 	tmpDir := t.TempDir()
 	m := NewManagerWithDir(tmpDir)
 
-	child := &types.ContextConfig{
+	child := &ContextConfig{
 		Name:    "orphan",
 		Extends: "nonexistent-parent",
 	}

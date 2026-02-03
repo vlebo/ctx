@@ -12,7 +12,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/vlebo/ctx/internal/config"
-	"github.com/vlebo/ctx/pkg/types"
 )
 
 // SecretsResult holds resolved secrets and metadata about what was loaded.
@@ -32,7 +31,7 @@ type SecretsResult struct {
 // vaultToken is the saved vault token for authentication.
 // gcpConfigDir is the per-context gcloud config directory (for CLOUDSDK_CONFIG).
 // awsCreds are optional cached credentials from aws-vault.
-func resolveAllSecrets(cfg *types.SecretsConfig, mgr *config.Manager, contextName string, bitwardenCfg *types.BitwardenConfig, onePasswordCfg *types.OnePasswordConfig, vaultCfg *types.VaultConfig, vaultToken string, awsCfg *types.AWSConfig, awsCreds *config.AWSCredentials, gcpCfg *types.GCPConfig, gcpConfigDir string, browserCfg *types.BrowserConfig) (*SecretsResult, error) {
+func resolveAllSecrets(cfg *config.SecretsConfig, mgr *config.Manager, contextName string, bitwardenCfg *config.BitwardenConfig, onePasswordCfg *config.OnePasswordConfig, vaultCfg *config.VaultConfig, vaultToken string, awsCfg *config.AWSConfig, awsCreds *config.AWSCredentials, gcpCfg *config.GCPConfig, gcpConfigDir string, browserCfg *config.BrowserConfig) (*SecretsResult, error) {
 	if cfg == nil {
 		return nil, nil
 	}
@@ -204,7 +203,7 @@ func checkVaultCLI() error {
 
 // ensureBitwardenUnlocked checks if Bitwarden is unlocked, auto-login if configured.
 // If mgr and contextName are provided, it will try to use/save session from keychain.
-func ensureBitwardenUnlocked(cfg *types.BitwardenConfig, mgr *config.Manager, contextName string, browserCfg *types.BrowserConfig) error {
+func ensureBitwardenUnlocked(cfg *config.BitwardenConfig, mgr *config.Manager, contextName string, browserCfg *config.BrowserConfig) error {
 	yellow := color.New(color.FgYellow)
 	green := color.New(color.FgGreen)
 
@@ -278,7 +277,10 @@ func ensureBitwardenUnlocked(cfg *types.BitwardenConfig, mgr *config.Manager, co
 	if strings.Contains(status, `"status":"unauthenticated"`) {
 		if !autoLogin {
 			if useSSO {
-				return fmt.Errorf("bitwarden not logged in. Run: bw login --sso")
+				if cfg != nil && cfg.OrgIdentifier != "" {
+					return fmt.Errorf("bitwarden not logged in. Run: bw login --sso %s", cfg.OrgIdentifier)
+				}
+				return fmt.Errorf("bitwarden not logged in. Run: bw login --sso (configure org_identifier in bitwarden config)")
 			}
 			return fmt.Errorf("bitwarden not logged in. Run: bw login")
 		}
@@ -374,7 +376,7 @@ func ensureBitwardenUnlocked(cfg *types.BitwardenConfig, mgr *config.Manager, co
 
 // ensureOnePasswordUnlocked checks if 1Password is unlocked, auto-login if configured.
 // If mgr and contextName are provided, it will try to use/save session from keychain.
-func ensureOnePasswordUnlocked(cfg *types.OnePasswordConfig, mgr *config.Manager, contextName string, browserCfg *types.BrowserConfig) error {
+func ensureOnePasswordUnlocked(cfg *config.OnePasswordConfig, mgr *config.Manager, contextName string, browserCfg *config.BrowserConfig) error {
 	yellow := color.New(color.FgYellow)
 	green := color.New(color.FgGreen)
 
@@ -594,7 +596,7 @@ func getOnePasswordSecret(itemSpec string) (string, error) {
 //   - API-style: "mount/data/path#field" (e.g., "operations/data/consul#http_user") - data/ is auto-stripped
 //
 // vaultToken is optional - if provided, it's used for authentication.
-func getVaultSecret(cfg *types.VaultConfig, vaultToken, pathSpec string) (string, error) {
+func getVaultSecret(cfg *config.VaultConfig, vaultToken, pathSpec string) (string, error) {
 	// Parse path and field
 	path := pathSpec
 	field := "value" // default field for KV v1
@@ -671,7 +673,7 @@ func checkGCloudCLI() error {
 // getAWSSecretsManagerSecret fetches a secret from AWS Secrets Manager.
 // secretSpec format: "secret-name" or "secret-name#json-key"
 // awsCreds are optional temporary credentials from aws-vault.
-func getAWSSecretsManagerSecret(cfg *types.AWSConfig, awsCreds *config.AWSCredentials, secretSpec string) (string, error) {
+func getAWSSecretsManagerSecret(cfg *config.AWSConfig, awsCreds *config.AWSCredentials, secretSpec string) (string, error) {
 	// Parse secret name and optional JSON key
 	secretName := secretSpec
 	jsonKey := ""
@@ -731,7 +733,7 @@ func getAWSSecretsManagerSecret(cfg *types.AWSConfig, awsCreds *config.AWSCreden
 
 // getAWSSSMParameter fetches a parameter from AWS Systems Manager Parameter Store.
 // awsCreds are optional temporary credentials from aws-vault.
-func getAWSSSMParameter(cfg *types.AWSConfig, awsCreds *config.AWSCredentials, paramPath string) (string, error) {
+func getAWSSSMParameter(cfg *config.AWSConfig, awsCreds *config.AWSCredentials, paramPath string) (string, error) {
 	args := []string{
 		"ssm", "get-parameter",
 		"--name", paramPath,
@@ -770,7 +772,7 @@ func getAWSSSMParameter(cfg *types.AWSConfig, awsCreds *config.AWSCredentials, p
 // secretSpec format: "secret-name" (uses latest version) or full resource name
 // e.g., "my-secret" or "projects/my-project/secrets/my-secret/versions/latest"
 // gcpConfigDir is the per-context gcloud config directory.
-func getGCPSecret(cfg *types.GCPConfig, gcpConfigDir, secretSpec string) (string, error) {
+func getGCPSecret(cfg *config.GCPConfig, gcpConfigDir, secretSpec string) (string, error) {
 	var secretPath string
 
 	// Check if it's a full resource path or just a secret name
