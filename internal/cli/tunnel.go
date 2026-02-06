@@ -330,8 +330,13 @@ func buildSSHArgs(sshConfig *config.SSHConfig, tunnels []config.TunnelConfig) []
 		args = append(args, "-L", forward)
 	}
 
-	// Add destination
-	dest := fmt.Sprintf("%s@%s", sshConfig.Bastion.User, sshConfig.Bastion.Host)
+	// Add destination (omit user@ to let SSH default to current OS user)
+	var dest string
+	if sshConfig.Bastion.User != "" {
+		dest = fmt.Sprintf("%s@%s", sshConfig.Bastion.User, sshConfig.Bastion.Host)
+	} else {
+		dest = sshConfig.Bastion.Host
+	}
 	args = append(args, dest)
 
 	return args

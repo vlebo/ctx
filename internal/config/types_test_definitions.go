@@ -73,12 +73,12 @@ func TestContextConfig_GetCloudProviders(t *testing.T) {
 		{
 			name: "custom cloud with all providers",
 			ctx: &ContextConfig{
-				Cloud: "huawei",
+				Cloud: "openstack",
 				AWS:   &AWSConfig{Profile: "test"},
 				GCP:   &GCPConfig{Project: "test"},
 				Azure: &AzureConfig{SubscriptionID: "test"},
 			},
-			want: []string{"huawei", "aws", "gcp", "azure"},
+			want: []string{"openstack", "aws", "gcp", "azure"},
 		},
 	}
 

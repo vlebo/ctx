@@ -319,7 +319,7 @@ type ContextConfig struct {
 	Description string            `yaml:"description" mapstructure:"description"`
 	Environment Environment       `yaml:"environment" mapstructure:"environment"`
 	EnvColor    string            `yaml:"env_color,omitempty" mapstructure:"env_color"` // red, yellow, green, blue, cyan, magenta, white
-	Cloud       string            `yaml:"cloud,omitempty" mapstructure:"cloud"`         // Custom cloud provider label (e.g., digitalocean, huawei)
+	Cloud       string            `yaml:"cloud,omitempty" mapstructure:"cloud"`         // Custom cloud provider label (e.g., digitalocean, openstack)
 	Tags        []string          `yaml:"tags" mapstructure:"tags"`
 	Tunnels     []TunnelConfig    `yaml:"tunnels,omitempty" mapstructure:"tunnels"`
 	// Databases

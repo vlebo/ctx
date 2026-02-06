@@ -4,6 +4,7 @@
 package ssh
 
 import (
+	"os/user"
 	"testing"
 
 	"github.com/vlebo/ctx/internal/config"
@@ -46,6 +47,40 @@ func TestConnection_IsConnected_NotConnected(t *testing.T) {
 
 	if conn.IsConnected() {
 		t.Error("Connection should not be connected initially")
+	}
+}
+
+func TestConnection_BuildSSHConfig_UserFallback(t *testing.T) {
+	// With explicit user
+	cfg := &config.SSHConfig{
+		Bastion: config.BastionConfig{
+			Host: "bastion.example.com",
+			User: "deploy",
+		},
+	}
+	conn := NewConnection(cfg)
+	sshCfg, err := conn.buildSSHConfig()
+	if err != nil {
+		t.Fatalf("buildSSHConfig() error = %v", err)
+	}
+	if sshCfg.User != "deploy" {
+		t.Errorf("User = %v, want deploy", sshCfg.User)
+	}
+
+	// Without user - should fall back to current OS user
+	cfg2 := &config.SSHConfig{
+		Bastion: config.BastionConfig{
+			Host: "bastion.example.com",
+		},
+	}
+	conn2 := NewConnection(cfg2)
+	sshCfg2, err := conn2.buildSSHConfig()
+	if err != nil {
+		t.Fatalf("buildSSHConfig() error = %v", err)
+	}
+	currentUser, _ := user.Current()
+	if sshCfg2.User != currentUser.Username {
+		t.Errorf("User = %v, want current OS user %v", sshCfg2.User, currentUser.Username)
 	}
 }
 

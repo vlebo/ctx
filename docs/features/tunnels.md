@@ -53,7 +53,7 @@ ssh:
   bastion:
     host: bastion.example.com    # Bastion hostname
     port: 22                     # SSH port (default: 22)
-    user: deploy                 # SSH username
+    user: deploy                 # SSH username (default: current OS user)
     identity_file: ~/.ssh/id_ed25519  # Private key path
 ```
 

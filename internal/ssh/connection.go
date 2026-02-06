@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/user"
 	"path/filepath"
 	"strings"
 	"time"
@@ -148,8 +149,16 @@ func (c *Connection) buildSSHConfig() (*ssh.ClientConfig, error) {
 		hostKeyCallback = ssh.InsecureIgnoreHostKey()
 	}
 
+	// Fall back to current OS user if not specified (same as ssh default)
+	sshUser := c.config.Bastion.User
+	if sshUser == "" {
+		if u, err := user.Current(); err == nil {
+			sshUser = u.Username
+		}
+	}
+
 	config := &ssh.ClientConfig{
-		User:            c.config.Bastion.User,
+		User:            sshUser,
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
 		Timeout:         30 * time.Second,

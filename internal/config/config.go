@@ -10,6 +10,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"time"
@@ -180,8 +181,14 @@ func (m *Manager) GetAppConfig() *AppConfig {
 
 // LoadContext loads a context configuration by name.
 // If the context extends another context, it will be merged with the parent.
+// After merging, ${VAR} references in string fields are expanded using the env: map.
 func (m *Manager) LoadContext(name string) (*ContextConfig, error) {
-	return m.loadContextWithChain(name, nil)
+	cfg, err := m.loadContextWithChain(name, nil)
+	if err != nil {
+		return nil, err
+	}
+	expandConfigVars(cfg)
+	return cfg, nil
 }
 
 // loadContextWithChain loads a context and tracks the inheritance chain to detect cycles.
@@ -556,6 +563,80 @@ func expandPath(path string) string {
 		}
 	}
 	return path
+}
+
+// expandConfigVars expands ${VAR} references in all string fields of a ContextConfig
+// using the env: map as the variable source. This enables template-based configs
+// where child contexts set variables that get expanded in inherited parent values.
+func expandConfigVars(cfg *ContextConfig) {
+	if len(cfg.Env) == 0 {
+		return
+	}
+	expandStructVars(reflect.ValueOf(cfg), cfg.Env, "")
+}
+
+// skipFields are struct field names that should not be expanded.
+var skipFields = map[string]bool{
+	"Name":    true,
+	"Extends": true,
+	"Env":     true,
+}
+
+// expandStructVars recursively walks a struct and expands ${VAR} in string fields.
+func expandStructVars(v reflect.Value, vars map[string]string, fieldName string) {
+	switch v.Kind() {
+	case reflect.Ptr:
+		if v.IsNil() {
+			return
+		}
+		expandStructVars(v.Elem(), vars, fieldName)
+
+	case reflect.Struct:
+		t := v.Type()
+		for i := 0; i < v.NumField(); i++ {
+			name := t.Field(i).Name
+			if skipFields[name] {
+				continue
+			}
+			expandStructVars(v.Field(i), vars, name)
+		}
+
+	case reflect.String:
+		if v.CanSet() {
+			s := v.String()
+			if strings.Contains(s, "$") {
+				expanded := os.Expand(s, func(key string) string {
+					if val, ok := vars[key]; ok {
+						return val
+					}
+					// Leave undefined vars as-is
+					return "${" + key + "}"
+				})
+				v.SetString(expanded)
+			}
+		}
+
+	case reflect.Slice:
+		for i := 0; i < v.Len(); i++ {
+			expandStructVars(v.Index(i), vars, fieldName)
+		}
+
+	case reflect.Map:
+		if v.Type().Key().Kind() == reflect.String && v.Type().Elem().Kind() == reflect.String {
+			for _, key := range v.MapKeys() {
+				val := v.MapIndex(key).String()
+				if strings.Contains(val, "$") {
+					expanded := os.Expand(val, func(k string) string {
+						if v, ok := vars[k]; ok {
+							return v
+						}
+						return "${" + k + "}"
+					})
+					v.SetMapIndex(key, reflect.ValueOf(expanded))
+				}
+			}
+		}
+	}
 }
 
 // ClearCurrentContext clears the current context.
