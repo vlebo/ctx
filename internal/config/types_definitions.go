@@ -120,6 +120,7 @@ type SSHConfig struct {
 	KeepaliveInterval int           `yaml:"keepalive_interval" mapstructure:"keepalive_interval"`
 	KeepaliveCountMax int           `yaml:"keepalive_count_max" mapstructure:"keepalive_count_max"`
 	Persistent        bool          `yaml:"persistent" mapstructure:"persistent"`
+	TunnelTimeout     int           `yaml:"tunnel_timeout" mapstructure:"tunnel_timeout"` // seconds, default 5
 }
 
 // TunnelConfig holds configuration for a single tunnel.
@@ -319,7 +320,7 @@ type ContextConfig struct {
 	Description string            `yaml:"description" mapstructure:"description"`
 	Environment Environment       `yaml:"environment" mapstructure:"environment"`
 	EnvColor    string            `yaml:"env_color,omitempty" mapstructure:"env_color"` // red, yellow, green, blue, cyan, magenta, white
-	Cloud       string            `yaml:"cloud,omitempty" mapstructure:"cloud"`         // Custom cloud provider label (e.g., digitalocean, huawei)
+	Cloud       string            `yaml:"cloud,omitempty" mapstructure:"cloud"`         // Custom cloud provider label (e.g., digitalocean, openstack)
 	Tags        []string          `yaml:"tags" mapstructure:"tags"`
 	Tunnels     []TunnelConfig    `yaml:"tunnels,omitempty" mapstructure:"tunnels"`
 	// Databases

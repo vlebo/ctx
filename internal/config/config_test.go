@@ -319,6 +319,197 @@ func TestManager_GenerateEnvVars(t *testing.T) {
 	}
 }
 
+func TestExpandConfigVars(t *testing.T) {
+	t.Run("basic expansion in nested structs", func(t *testing.T) {
+		cfg := &ContextConfig{
+			Name:        "alpha",
+			Environment: EnvProduction,
+			Env: map[string]string{
+				"CLUSTER_NAME": "alpha",
+			},
+			Kubernetes: &KubernetesConfig{
+				Context:    "acme-cloud-${CLUSTER_NAME}-cluster",
+				Namespace:  "default",
+				Kubeconfig: "~/clusters/acme-cloud/${CLUSTER_NAME}/config",
+			},
+		}
+
+		expandConfigVars(cfg)
+
+		if cfg.Kubernetes.Context != "acme-cloud-alpha-cluster" {
+			t.Errorf("Kubernetes.Context = %v, want acme-cloud-alpha-cluster", cfg.Kubernetes.Context)
+		}
+		if cfg.Kubernetes.Kubeconfig != "~/clusters/acme-cloud/alpha/config" {
+			t.Errorf("Kubernetes.Kubeconfig = %v, want ~/clusters/acme-cloud/alpha/config", cfg.Kubernetes.Kubeconfig)
+		}
+		if cfg.Kubernetes.Namespace != "default" {
+			t.Errorf("Kubernetes.Namespace = %v, want default", cfg.Kubernetes.Namespace)
+		}
+	})
+
+	t.Run("expansion in tunnels slice", func(t *testing.T) {
+		cfg := &ContextConfig{
+			Name: "test",
+			Env: map[string]string{
+				"CLUSTER_NAME": "alpha",
+			},
+			Tunnels: []TunnelConfig{
+				{
+					Name:       "bastion",
+					RemoteHost: "bastion.${CLUSTER_NAME}.example.com",
+					RemotePort: 8080,
+					LocalPort:  8080,
+				},
+			},
+		}
+
+		expandConfigVars(cfg)
+
+		if cfg.Tunnels[0].RemoteHost != "bastion.alpha.example.com" {
+			t.Errorf("Tunnels[0].RemoteHost = %v, want bastion.alpha.example.com", cfg.Tunnels[0].RemoteHost)
+		}
+	})
+
+	t.Run("expansion in map values (urls)", func(t *testing.T) {
+		cfg := &ContextConfig{
+			Name: "test",
+			Env: map[string]string{
+				"CLUSTER_NAME": "alpha",
+			},
+			URLs: map[string]string{
+				"dashboard": "https://${CLUSTER_NAME}.example.com/dashboard",
+				"argocd":    "https://argocd.${CLUSTER_NAME}.example.com",
+			},
+		}
+
+		expandConfigVars(cfg)
+
+		if cfg.URLs["dashboard"] != "https://alpha.example.com/dashboard" {
+			t.Errorf("URLs[dashboard] = %v, want https://alpha.example.com/dashboard", cfg.URLs["dashboard"])
+		}
+		if cfg.URLs["argocd"] != "https://argocd.alpha.example.com" {
+			t.Errorf("URLs[argocd] = %v, want https://argocd.alpha.example.com", cfg.URLs["argocd"])
+		}
+	})
+
+	t.Run("undefined vars left as-is", func(t *testing.T) {
+		cfg := &ContextConfig{
+			Name: "test",
+			Env: map[string]string{
+				"CLUSTER_NAME": "alpha",
+			},
+			Kubernetes: &KubernetesConfig{
+				Context: "acme-cloud-${CLUSTER_NAME}-${UNDEFINED_VAR}",
+			},
+		}
+
+		expandConfigVars(cfg)
+
+		if cfg.Kubernetes.Context != "acme-cloud-alpha-${UNDEFINED_VAR}" {
+			t.Errorf("Kubernetes.Context = %v, want acme-cloud-alpha-${UNDEFINED_VAR}", cfg.Kubernetes.Context)
+		}
+	})
+
+	t.Run("name and extends not expanded", func(t *testing.T) {
+		cfg := &ContextConfig{
+			Name:    "${CLUSTER_NAME}",
+			Extends: "${PARENT}",
+			Env: map[string]string{
+				"CLUSTER_NAME": "alpha",
+				"PARENT":       "acme-cloud",
+			},
+		}
+
+		expandConfigVars(cfg)
+
+		if cfg.Name != "${CLUSTER_NAME}" {
+			t.Errorf("Name was expanded to %v, should not be expanded", cfg.Name)
+		}
+		if cfg.Extends != "${PARENT}" {
+			t.Errorf("Extends was expanded to %v, should not be expanded", cfg.Extends)
+		}
+	})
+
+	t.Run("env values not expanded", func(t *testing.T) {
+		cfg := &ContextConfig{
+			Name: "test",
+			Env: map[string]string{
+				"CLUSTER_NAME": "alpha",
+				"CLUSTER_FQDN": "${CLUSTER_NAME}.example.com",
+			},
+		}
+
+		expandConfigVars(cfg)
+
+		// Env values should NOT be expanded (they're the source, not targets)
+		if cfg.Env["CLUSTER_FQDN"] != "${CLUSTER_NAME}.example.com" {
+			t.Errorf("Env[CLUSTER_FQDN] = %v, should not be expanded", cfg.Env["CLUSTER_FQDN"])
+		}
+	})
+
+	t.Run("empty env map no-op", func(t *testing.T) {
+		cfg := &ContextConfig{
+			Name: "test",
+			Kubernetes: &KubernetesConfig{
+				Context: "some-${VAR}-cluster",
+			},
+		}
+
+		expandConfigVars(cfg)
+
+		if cfg.Kubernetes.Context != "some-${VAR}-cluster" {
+			t.Errorf("Kubernetes.Context = %v, should not change with empty env", cfg.Kubernetes.Context)
+		}
+	})
+
+	t.Run("multiple variables in one string", func(t *testing.T) {
+		cfg := &ContextConfig{
+			Name: "test",
+			Env: map[string]string{
+				"PROVIDER": "acme-cloud",
+				"CLUSTER":  "alpha",
+				"REGION":   "eu-west",
+			},
+			Kubernetes: &KubernetesConfig{
+				Context: "${PROVIDER}-${REGION}-${CLUSTER}",
+			},
+		}
+
+		expandConfigVars(cfg)
+
+		if cfg.Kubernetes.Context != "acme-cloud-eu-west-alpha" {
+			t.Errorf("Kubernetes.Context = %v, want acme-cloud-eu-west-alpha", cfg.Kubernetes.Context)
+		}
+	})
+
+	t.Run("expansion in deeply nested structs", func(t *testing.T) {
+		cfg := &ContextConfig{
+			Name: "test",
+			Env: map[string]string{
+				"CLUSTER_NAME": "alpha",
+			},
+			SSH: &SSHConfig{
+				Bastion: BastionConfig{
+					Host: "bastion.${CLUSTER_NAME}.example.com",
+					User: "admin",
+				},
+			},
+			VPN: &VPNConfig{
+				ConfigFile: "/etc/vpn/${CLUSTER_NAME}.conf",
+			},
+		}
+
+		expandConfigVars(cfg)
+
+		if cfg.SSH.Bastion.Host != "bastion.alpha.example.com" {
+			t.Errorf("SSH.Bastion.Host = %v, want bastion.alpha.example.com", cfg.SSH.Bastion.Host)
+		}
+		if cfg.VPN.ConfigFile != "/etc/vpn/alpha.conf" {
+			t.Errorf("VPN.ConfigFile = %v, want /etc/vpn/alpha.conf", cfg.VPN.ConfigFile)
+		}
+	})
+}
+
 func TestManager_GenerateEnvVars_Kubernetes(t *testing.T) {
 	tmpDir := t.TempDir()
 	m := NewManagerWithDir(tmpDir)

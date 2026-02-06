@@ -208,3 +208,68 @@ company-base (abstract)
     ├── company-eu-staging
     └── company-eu-prod
 ```
+
+## Variable Expansion
+
+Combine inheritance with `${VAR}` expansion for maximum reuse. Variables defined in `env:` are expanded in all config string fields after inheritance is resolved.
+
+This is ideal when managing many clusters that follow the same pattern:
+
+```yaml
+# acme-cloud.yaml (abstract base)
+name: acme-cloud
+abstract: true
+cloud: acme-cloud
+environment: production
+
+kubernetes:
+  context: "acme-cloud-${CLUSTER_NAME}-cluster"
+  kubeconfig: "~/clusters/acme-cloud/${CLUSTER_NAME}/config"
+  namespace: default
+
+tunnels:
+  - name: bastion
+    remote_host: "bastion.${CLUSTER_NAME}.acme-cloud.example.com"
+    remote_port: 8080
+    local_port: 8080
+
+urls:
+  dashboard: "https://${CLUSTER_NAME}.example.com"
+  argocd: "https://argocd.${CLUSTER_NAME}.example.com"
+```
+
+Each cluster context is just 4 lines:
+
+```yaml
+# alpha.yaml
+name: alpha
+extends: acme-cloud
+env:
+  CLUSTER_NAME: alpha
+
+# beta.yaml
+name: beta
+extends: acme-cloud
+env:
+  CLUSTER_NAME: beta
+
+# gamma.yaml
+name: gamma
+extends: acme-cloud
+env:
+  CLUSTER_NAME: gamma
+```
+
+After `ctx use alpha`, all `${CLUSTER_NAME}` references resolve to `alpha`:
+
+- `kubernetes.context` → `acme-cloud-alpha-cluster`
+- `kubernetes.kubeconfig` → `~/clusters/acme-cloud/alpha/config`
+- `tunnels[0].remote_host` → `bastion.alpha.acme-cloud.example.com`
+- `urls.dashboard` → `https://alpha.example.com`
+
+**Rules:**
+
+- Only `${VAR}` syntax is supported
+- Variables come from `env:` map only (not OS environment)
+- Undefined variables are left as `${VAR}` (no error)
+- `name`, `extends`, and `env` values themselves are not expanded

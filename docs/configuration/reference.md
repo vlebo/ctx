@@ -12,7 +12,7 @@ Complete reference for all context configuration options.
 | `extends` | string | Parent context name to inherit from |
 | `abstract` | bool | If true, context cannot be used directly |
 | `env_color` | string | Prompt color: `red`, `yellow`, `green`, `blue`, `cyan`, `magenta`, `white` |
-| `cloud` | string | Cloud provider label for platforms without native integration (e.g., `digitalocean`, `huawei`, `otc`). Shows in CLOUD column alongside auto-detected providers. Useful for identifying where your Kubernetes cluster is hosted when using non-major cloud providers. |
+| `cloud` | string | Cloud provider label for platforms without native integration (e.g., `digitalocean`, `openstack`, `otc`). Shows in CLOUD column alongside auto-detected providers. Useful for identifying where your Kubernetes cluster is hosted when using non-major cloud providers. |
 | `tags` | []string | Tags for filtering and organization |
 
 ## AWS
@@ -101,8 +101,9 @@ ssh:
   bastion:
     host: string            # Bastion hostname
     port: int               # SSH port (default: 22)
-    user: string            # SSH username
+    user: string            # SSH username (default: current OS user)
     identity_file: string   # Path to SSH private key
+  tunnel_timeout: int       # Seconds to wait for tunnel connection (default: 5)
 ```
 
 ## Tunnels
@@ -257,6 +258,8 @@ env:
   VAR_NAME: value           # Custom environment variable
 ```
 
+Variables defined in `env:` can be referenced as `${VAR_NAME}` in other config fields. See [Variable Expansion](#variable-expansion) below.
+
 ## Deactivate Behavior
 
 ```yaml
@@ -264,3 +267,50 @@ deactivate:
   disconnect_vpn: bool      # Disconnect VPN on deactivate (default: true)
   stop_tunnels: bool        # Stop tunnels on deactivate (default: true)
 ```
+
+## Variable Expansion
+
+Config values can reference variables from the `env:` map using `${VAR}` syntax. This is especially powerful when combined with [inheritance](inheritance.md) to create reusable templates.
+
+**Syntax:** `${VAR_NAME}`
+
+**Rules:**
+
+- Variables are expanded from the `env:` map only (not OS environment)
+- Expansion happens after inheritance merging
+- Undefined variables are left as-is
+- `name`, `extends`, and `env` values are not expanded
+
+**Example:**
+
+```yaml
+# acme-cloud.yaml (base template)
+name: acme-cloud
+abstract: true
+cloud: acme-cloud
+environment: production
+kubernetes:
+  context: "acme-cloud-${CLUSTER_NAME}-cluster"
+  kubeconfig: "~/clusters/acme-cloud/${CLUSTER_NAME}/config"
+tunnels:
+  - name: bastion
+    remote_host: "bastion.${CLUSTER_NAME}.example.com"
+    remote_port: 8080
+    local_port: 8080
+urls:
+  dashboard: "https://${CLUSTER_NAME}.example.com"
+
+# alpha.yaml (just 4 lines!)
+name: alpha
+extends: acme-cloud
+env:
+  CLUSTER_NAME: alpha
+
+# beta.yaml
+name: beta
+extends: acme-cloud
+env:
+  CLUSTER_NAME: beta
+```
+
+After loading `alpha.yaml`, all `${CLUSTER_NAME}` references resolve to `alpha`.
