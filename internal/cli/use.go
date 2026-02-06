@@ -204,9 +204,15 @@ func switchContext(mgr *config.Manager, ctx *config.ContextConfig) ([]string, er
 	}
 
 	// Start auto-connect tunnels
+	var failedTunnels []string
 	if len(ctx.Tunnels) > 0 && ctx.SSH != nil && ctx.SSH.Bastion.Host != "" {
-		if _, err := startAutoConnectTunnels(mgr, ctx); err != nil {
+		var err error
+		_, failedTunnels, err = startAutoConnectTunnels(mgr, ctx)
+		if err != nil {
 			yellow.Fprintf(os.Stderr, "⚠ Tunnel auto-connect failed: %v\n", err)
+			failures = append(failures, "Tunnels")
+		} else if len(failedTunnels) > 0 {
+			failures = append(failures, "Tunnels")
 		}
 	}
 
@@ -983,6 +989,7 @@ func renameKubeContext(oldName, newName, kubeconfig string) error {
 // Items in the failures list are skipped (no checkmark shown).
 func printSwitchSuccess(ctx *config.ContextConfig, failures []string) {
 	green := color.New(color.FgGreen)
+	yellow := color.New(color.FgYellow)
 	cyan := color.New(color.FgCyan)
 
 	// Helper to check if an item failed
@@ -1035,13 +1042,25 @@ func printSwitchSuccess(ctx *config.ContextConfig, failures []string) {
 	}
 
 	if ctx.Nomad != nil {
-		green.Print("✓ ")
-		fmt.Printf("Nomad: %s\n", ctx.Nomad.Address)
+		// Show warning if Nomad uses localhost and tunnels failed
+		if failed("Tunnels") && strings.Contains(ctx.Nomad.Address, "localhost") {
+			yellow.Print("⚠ ")
+			fmt.Printf("Nomad: %s (tunnel failed)\n", ctx.Nomad.Address)
+		} else {
+			green.Print("✓ ")
+			fmt.Printf("Nomad: %s\n", ctx.Nomad.Address)
+		}
 	}
 
 	if ctx.Consul != nil {
-		green.Print("✓ ")
-		fmt.Printf("Consul: %s\n", ctx.Consul.Address)
+		// Show warning if Consul uses localhost and tunnels failed
+		if failed("Tunnels") && strings.Contains(ctx.Consul.Address, "localhost") {
+			yellow.Print("⚠ ")
+			fmt.Printf("Consul: %s (tunnel failed)\n", ctx.Consul.Address)
+		} else {
+			green.Print("✓ ")
+			fmt.Printf("Consul: %s\n", ctx.Consul.Address)
+		}
 	}
 
 	// Vault

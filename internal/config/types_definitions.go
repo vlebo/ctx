@@ -120,6 +120,7 @@ type SSHConfig struct {
 	KeepaliveInterval int           `yaml:"keepalive_interval" mapstructure:"keepalive_interval"`
 	KeepaliveCountMax int           `yaml:"keepalive_count_max" mapstructure:"keepalive_count_max"`
 	Persistent        bool          `yaml:"persistent" mapstructure:"persistent"`
+	TunnelTimeout     int           `yaml:"tunnel_timeout" mapstructure:"tunnel_timeout"` // seconds, default 5
 }
 
 // TunnelConfig holds configuration for a single tunnel.

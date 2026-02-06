@@ -204,6 +204,12 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Starting tunnels for %s...\n", ctx.Name)
 
+	// Get tunnel timeout (default 5 seconds)
+	tunnelTimeout := 5
+	if ctx.SSH.TunnelTimeout > 0 {
+		tunnelTimeout = ctx.SSH.TunnelTimeout
+	}
+
 	// Start each tunnel as a separate SSH process
 	green := color.New(color.FgGreen)
 	yellow := color.New(color.FgYellow)
@@ -251,15 +257,27 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 			continue
 		}
 
-		// Give SSH a moment to establish connection
-		time.Sleep(300 * time.Millisecond)
+		// Wait to see if SSH exits early (auth failure) or stays running (connected)
+		exitCh := make(chan error, 1)
+		go func() {
+			exitCh <- sshCmd.Wait()
+		}()
 
-		// Check if process is still running
-		if !isProcessRunning(sshCmd.Process.Pid) {
+		// Wait for tunnel to connect or fail
+		select {
+		case <-exitCh:
+			// Process exited - connection failed
 			logFd.Close()
 			logContent, _ := os.ReadFile(logFile)
-			yellow.Printf("⚠ %s: failed to connect. Log: %s\n", t.Name, string(logContent))
+			// Extract first line of error for cleaner output
+			errMsg := strings.TrimSpace(string(logContent))
+			if idx := strings.Index(errMsg, "\n"); idx > 0 {
+				errMsg = errMsg[:idx]
+			}
+			yellow.Printf("⚠ Tunnel %s: %s\n", t.Name, errMsg)
 			continue
+		case <-time.After(time.Duration(tunnelTimeout) * time.Second):
+			// Process still running - connected successfully
 		}
 
 		// Save to state
@@ -512,9 +530,20 @@ func runTunnelDown(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
+// pendingTunnel holds information about a tunnel being started.
+type pendingTunnel struct {
+	config      config.TunnelConfig
+	actualPort  int
+	portChanged bool
+	cmd         *exec.Cmd
+	logFile     string
+	logFd       *os.File
+	exitCh      chan error
+}
+
 // startAutoConnectTunnels starts tunnels that have auto_connect enabled.
-// Called during context switch. Returns the list of successfully started tunnel names.
-func startAutoConnectTunnels(mgr *config.Manager, ctx *config.ContextConfig) ([]string, error) {
+// Called during context switch. Returns (successfulTunnels, failedTunnels, error).
+func startAutoConnectTunnels(mgr *config.Manager, ctx *config.ContextConfig) ([]string, []string, error) {
 	// Filter tunnels with auto_connect
 	var autoConnectTunnels []config.TunnelConfig
 	for _, t := range ctx.Tunnels {
@@ -524,13 +553,13 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *config.ContextConfig) ([]
 	}
 
 	if len(autoConnectTunnels) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// Get state directory
 	stateDir := filepath.Join(mgr.StateDir(), "tunnels")
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
-		return nil, fmt.Errorf("failed to create state directory: %w", err)
+		return nil, nil, fmt.Errorf("failed to create state directory: %w", err)
 	}
 
 	// Load existing state
@@ -548,9 +577,9 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *config.ContextConfig) ([]
 
 	yellow := color.New(color.FgYellow)
 	green := color.New(color.FgGreen)
-	startedCount := 0
-	var startedTunnels []string
 
+	// Phase 1: Start all tunnels in parallel
+	var pending []pendingTunnel
 	for _, t := range autoConnectTunnels {
 		// Check if this tunnel is already running
 		if entry, exists := state.TunnelPIDs[t.Name]; exists {
@@ -579,7 +608,7 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *config.ContextConfig) ([]
 		logFile := filepath.Join(stateDir, fmt.Sprintf("%s-%s.log", ctx.Name, t.Name))
 		logFd, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
 		if err != nil {
-			yellow.Fprintf(os.Stderr, "⚠ %s: failed to create log file: %v\n", t.Name, err)
+			yellow.Fprintf(os.Stderr, "⚠ Tunnel %s: failed to create log file: %v\n", t.Name, err)
 			continue
 		}
 		sshCmd.Stdout = logFd
@@ -587,33 +616,72 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *config.ContextConfig) ([]
 
 		if err := sshCmd.Start(); err != nil {
 			logFd.Close()
-			yellow.Fprintf(os.Stderr, "⚠ %s: failed to start: %v\n", t.Name, err)
+			yellow.Fprintf(os.Stderr, "⚠ Tunnel %s: failed to start: %v\n", t.Name, err)
 			continue
 		}
 
-		// Give SSH a moment to establish connection
-		time.Sleep(300 * time.Millisecond)
+		// Start goroutine to wait for process exit
+		exitCh := make(chan error, 1)
+		go func(cmd *exec.Cmd) {
+			exitCh <- cmd.Wait()
+		}(sshCmd)
 
-		if !isProcessRunning(sshCmd.Process.Pid) {
-			logFd.Close()
-			logContent, _ := os.ReadFile(logFile)
-			yellow.Fprintf(os.Stderr, "⚠ %s: failed to connect. Log: %s\n", t.Name, string(logContent))
-			continue
-		}
+		pending = append(pending, pendingTunnel{
+			config:      tunnelConfig,
+			actualPort:  actualPort,
+			portChanged: portChanged,
+			cmd:         sshCmd,
+			logFile:     logFile,
+			logFd:       logFd,
+			exitCh:      exitCh,
+		})
+	}
 
-		state.TunnelPIDs[t.Name] = tunnelEntry{
-			PID:       sshCmd.Process.Pid,
-			StartedAt: time.Now(),
-			Config:    tunnelConfig,
-		}
-		startedCount++
-		startedTunnels = append(startedTunnels, t.Name)
+	if len(pending) == 0 {
+		return nil, nil, nil
+	}
 
-		if portChanged {
-			green.Fprintf(os.Stderr, "✓ Tunnel %s: localhost:%d → %s:%d ", t.Name, actualPort, t.RemoteHost, t.RemotePort)
-			yellow.Fprintf(os.Stderr, "(port %d in use)\n", t.LocalPort)
-		} else {
-			green.Fprintf(os.Stderr, "✓ Tunnel %s: localhost:%d → %s:%d\n", t.Name, t.LocalPort, t.RemoteHost, t.RemotePort)
+	// Phase 2: Wait for tunnels to either connect or fail
+	// SSH auth failures typically complete within 2-3 seconds
+	timeout := 5 // default 5 seconds
+	if ctx.SSH != nil && ctx.SSH.TunnelTimeout > 0 {
+		timeout = ctx.SSH.TunnelTimeout
+	}
+	time.Sleep(time.Duration(timeout) * time.Second)
+
+	// Phase 3: Check results and report
+	var startedTunnels []string
+	var failedTunnels []string
+	for _, p := range pending {
+		t := p.config
+
+		// Check if process exited (failed) or still running (connected)
+		select {
+		case <-p.exitCh:
+			// Process exited - connection failed
+			p.logFd.Close()
+			logContent, _ := os.ReadFile(p.logFile)
+			errMsg := strings.TrimSpace(string(logContent))
+			if idx := strings.Index(errMsg, "\n"); idx > 0 {
+				errMsg = errMsg[:idx]
+			}
+			yellow.Fprintf(os.Stderr, "⚠ Tunnel %s: %s\n", t.Name, errMsg)
+			failedTunnels = append(failedTunnels, t.Name)
+		default:
+			// Process still running - connected successfully
+			state.TunnelPIDs[t.Name] = tunnelEntry{
+				PID:       p.cmd.Process.Pid,
+				StartedAt: time.Now(),
+				Config:    t,
+			}
+			startedTunnels = append(startedTunnels, t.Name)
+
+			if p.portChanged {
+				green.Fprintf(os.Stderr, "✓ Tunnel %s: localhost:%d → %s:%d ", t.Name, p.actualPort, t.RemoteHost, t.RemotePort)
+				yellow.Fprintf(os.Stderr, "(port %d in use)\n", t.LocalPort)
+			} else {
+				green.Fprintf(os.Stderr, "✓ Tunnel %s: localhost:%d → %s:%d\n", t.Name, t.LocalPort, t.RemoteHost, t.RemotePort)
+			}
 		}
 	}
 
@@ -622,7 +690,7 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *config.ContextConfig) ([]
 		fmt.Fprintf(os.Stderr, "Warning: failed to save state: %v\n", err)
 	}
 
-	return startedTunnels, nil
+	return startedTunnels, failedTunnels, nil
 }
 
 func runTunnelStatus(cmd *cobra.Command, args []string) error {

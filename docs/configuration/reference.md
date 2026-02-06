@@ -103,6 +103,7 @@ ssh:
     port: int               # SSH port (default: 22)
     user: string            # SSH username (default: current OS user)
     identity_file: string   # Path to SSH private key
+  tunnel_timeout: int       # Seconds to wait for tunnel connection (default: 5)
 ```
 
 ## Tunnels
