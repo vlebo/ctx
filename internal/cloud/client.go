@@ -38,12 +38,12 @@ func (c *Client) IsConfigured() bool {
 
 // AuditEvent represents an audit event to send to the cloud server.
 type AuditEvent struct {
-	Action       string                 `json:"action"`
-	ContextName  string                 `json:"context_name,omitempty"`
-	Environment  string                 `json:"environment,omitempty"`
-	Details      map[string]interface{} `json:"details,omitempty"`
-	Success      bool                   `json:"success"`
-	ErrorMessage string                 `json:"error_message,omitempty"`
+	Action       string         `json:"action"`
+	ContextName  string         `json:"context_name,omitempty"`
+	Environment  string         `json:"environment,omitempty"`
+	Details      map[string]any `json:"details,omitempty"`
+	Success      bool           `json:"success"`
+	ErrorMessage string         `json:"error_message,omitempty"`
 }
 
 // HeartbeatInput represents heartbeat data to send to the cloud server.
@@ -56,15 +56,15 @@ type HeartbeatInput struct {
 
 // SharedContext represents a context fetched from the cloud server.
 type SharedContext struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Description string                 `json:"description,omitempty"`
-	Environment string                 `json:"environment,omitempty"`
-	Config      map[string]interface{} `json:"config"`
-	Version     int                    `json:"version"`
-	IsAbstract  bool                   `json:"is_abstract"`
-	Extends     string                 `json:"extends,omitempty"`
-	UpdatedAt   string                 `json:"updated_at"`
+	ID          string         `json:"id"`
+	Name        string         `json:"name"`
+	Description string         `json:"description,omitempty"`
+	Environment string         `json:"environment,omitempty"`
+	Config      map[string]any `json:"config"`
+	Version     int            `json:"version"`
+	IsAbstract  bool           `json:"is_abstract"`
+	Extends     string         `json:"extends,omitempty"`
+	UpdatedAt   string         `json:"updated_at"`
 }
 
 // apiResponse wraps API responses.
@@ -74,13 +74,13 @@ type apiResponse struct {
 }
 
 type apiError struct {
-	Code    string                 `json:"code"`
-	Message string                 `json:"message"`
-	Details map[string]interface{} `json:"details,omitempty"`
+	Code    string         `json:"code"`
+	Message string         `json:"message"`
+	Details map[string]any `json:"details,omitempty"`
 }
 
 // request makes an HTTP request to the cloud server.
-func (c *Client) request(method, path string, body interface{}) ([]byte, error) {
+func (c *Client) request(method, path string, body any) ([]byte, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)

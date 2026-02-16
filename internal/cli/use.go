@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -166,6 +167,44 @@ func switchContext(mgr *config.Manager, ctx *config.ContextConfig) ([]string, er
 		}
 	}
 
+	// Resolve secret files (before orchestration, so ${KUBECONFIG} etc. can be used)
+	var secretFilePaths map[string]string
+	if ctx.Secrets != nil && len(ctx.Secrets.Files) > 0 {
+		// Get GCP config dir for per-context credentials
+		sfGCPConfigDir := ""
+		if ctx.GCP != nil {
+			sfGCPConfigDir = mgr.GCPConfigDir(ctx.Name)
+		}
+
+		// Load cached AWS credentials if using aws-vault
+		var sfAWSCreds *config.AWSCredentials
+		if ctx.AWS != nil && ctx.AWS.UseVault {
+			sfAWSCreds = mgr.LoadAWSCredentials(ctx.Name)
+		}
+
+		// Load vault token from keychain
+		sfVaultToken := ""
+		if ctx.Vault != nil {
+			sfVaultToken = mgr.LoadVaultToken(ctx.Name)
+		}
+
+		sfResult, err := resolveSecretFiles(ctx.Secrets, mgr, ctx.Name, ctx.Bitwarden, ctx.OnePassword,
+			ctx.Vault, sfVaultToken, ctx.AWS, sfAWSCreds, ctx.GCP, sfGCPConfigDir, ctx.Browser)
+		if err != nil {
+			yellow.Fprintf(os.Stderr, "⚠ Secret files resolution failed: %v\n", err)
+			failures = append(failures, "SecretFiles")
+		} else if sfResult != nil {
+			secretFilePaths = sfResult.EnvVars
+			// Add file paths to ctx.Env so they can be referenced via ${VAR}
+			if ctx.Env == nil {
+				ctx.Env = make(map[string]string)
+			}
+			maps.Copy(ctx.Env, secretFilePaths)
+			// Re-run variable interpolation so ${KUBECONFIG} etc. resolve to temp file paths
+			config.ExpandConfigVars(ctx)
+		}
+	}
+
 	// Switch orchestration tools
 	if ctx.Kubernetes != nil {
 		if err := switchKubernetes(ctx.Kubernetes, ctx, mgr); err != nil {
@@ -262,6 +301,14 @@ func switchContext(mgr *config.Manager, ctx *config.ContextConfig) ([]string, er
 		return failures, fmt.Errorf("failed to set current context: %w", err)
 	}
 
+	// Merge secret file paths into secrets map so they're included in the env file
+	if len(secretFilePaths) > 0 {
+		if secrets == nil {
+			secrets = make(map[string]string)
+		}
+		maps.Copy(secrets, secretFilePaths)
+	}
+
 	// Write environment file for shell hook (including resolved secrets)
 	if err := mgr.WriteEnvFileWithSecrets(ctx, secrets); err != nil {
 		return failures, fmt.Errorf("failed to write environment file: %w", err)
@@ -301,7 +348,7 @@ func sendCloudEvents(mgr *config.Manager, ctx *config.ContextConfig, failures []
 	}
 
 	// Build details for audit event
-	details := make(map[string]interface{})
+	details := make(map[string]any)
 	if ctx.AWS != nil {
 		details["aws_profile"] = ctx.AWS.Profile
 		details["aws_region"] = ctx.AWS.Region
@@ -375,7 +422,7 @@ func sendAbortEvent(mgr *config.Manager, ctx *config.ContextConfig, failures []s
 		return
 	}
 
-	details := map[string]interface{}{
+	details := map[string]any{
 		"partial_failures": failures,
 		"aborted":          true,
 	}
@@ -1138,6 +1185,12 @@ func printSwitchSuccess(ctx *config.ContextConfig, failures []string) {
 			}
 			fmt.Printf("Secrets: %s\n", strings.Join(providers, ", "))
 		}
+	}
+
+	// Secret files
+	if ctx.Secrets != nil && len(ctx.Secrets.Files) > 0 && !failed("SecretFiles") {
+		green.Print("✓ ")
+		fmt.Printf("Secret files: %d file(s)\n", len(ctx.Secrets.Files))
 	}
 
 	if len(ctx.Env) > 0 {

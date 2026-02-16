@@ -815,7 +815,7 @@ func sendTunnelEvent(mgr *config.Manager, contextName, environment, action strin
 		return
 	}
 
-	details := map[string]interface{}{
+	details := map[string]any{
 		"tunnels": tunnelNames,
 	}
 

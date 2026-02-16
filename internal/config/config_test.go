@@ -334,7 +334,7 @@ func TestExpandConfigVars(t *testing.T) {
 			},
 		}
 
-		expandConfigVars(cfg)
+		ExpandConfigVars(cfg)
 
 		if cfg.Kubernetes.Context != "acme-cloud-alpha-cluster" {
 			t.Errorf("Kubernetes.Context = %v, want acme-cloud-alpha-cluster", cfg.Kubernetes.Context)
@@ -363,7 +363,7 @@ func TestExpandConfigVars(t *testing.T) {
 			},
 		}
 
-		expandConfigVars(cfg)
+		ExpandConfigVars(cfg)
 
 		if cfg.Tunnels[0].RemoteHost != "bastion.alpha.example.com" {
 			t.Errorf("Tunnels[0].RemoteHost = %v, want bastion.alpha.example.com", cfg.Tunnels[0].RemoteHost)
@@ -382,7 +382,7 @@ func TestExpandConfigVars(t *testing.T) {
 			},
 		}
 
-		expandConfigVars(cfg)
+		ExpandConfigVars(cfg)
 
 		if cfg.URLs["dashboard"] != "https://alpha.example.com/dashboard" {
 			t.Errorf("URLs[dashboard] = %v, want https://alpha.example.com/dashboard", cfg.URLs["dashboard"])
@@ -403,7 +403,7 @@ func TestExpandConfigVars(t *testing.T) {
 			},
 		}
 
-		expandConfigVars(cfg)
+		ExpandConfigVars(cfg)
 
 		if cfg.Kubernetes.Context != "acme-cloud-alpha-${UNDEFINED_VAR}" {
 			t.Errorf("Kubernetes.Context = %v, want acme-cloud-alpha-${UNDEFINED_VAR}", cfg.Kubernetes.Context)
@@ -420,7 +420,7 @@ func TestExpandConfigVars(t *testing.T) {
 			},
 		}
 
-		expandConfigVars(cfg)
+		ExpandConfigVars(cfg)
 
 		if cfg.Name != "${CLUSTER_NAME}" {
 			t.Errorf("Name was expanded to %v, should not be expanded", cfg.Name)
@@ -439,7 +439,7 @@ func TestExpandConfigVars(t *testing.T) {
 			},
 		}
 
-		expandConfigVars(cfg)
+		ExpandConfigVars(cfg)
 
 		// Env values should NOT be expanded (they're the source, not targets)
 		if cfg.Env["CLUSTER_FQDN"] != "${CLUSTER_NAME}.example.com" {
@@ -455,7 +455,7 @@ func TestExpandConfigVars(t *testing.T) {
 			},
 		}
 
-		expandConfigVars(cfg)
+		ExpandConfigVars(cfg)
 
 		if cfg.Kubernetes.Context != "some-${VAR}-cluster" {
 			t.Errorf("Kubernetes.Context = %v, should not change with empty env", cfg.Kubernetes.Context)
@@ -475,7 +475,7 @@ func TestExpandConfigVars(t *testing.T) {
 			},
 		}
 
-		expandConfigVars(cfg)
+		ExpandConfigVars(cfg)
 
 		if cfg.Kubernetes.Context != "acme-cloud-eu-west-alpha" {
 			t.Errorf("Kubernetes.Context = %v, want acme-cloud-eu-west-alpha", cfg.Kubernetes.Context)
@@ -499,7 +499,7 @@ func TestExpandConfigVars(t *testing.T) {
 			},
 		}
 
-		expandConfigVars(cfg)
+		ExpandConfigVars(cfg)
 
 		if cfg.SSH.Bastion.Host != "bastion.alpha.example.com" {
 			t.Errorf("SSH.Bastion.Host = %v, want bastion.alpha.example.com", cfg.SSH.Bastion.Host)
@@ -776,6 +776,122 @@ func TestManager_LoadContext_ParentNotFound(t *testing.T) {
 	_, err := m.LoadContext("orphan")
 	if err == nil {
 		t.Error("LoadContext() should fail when parent not found")
+	}
+}
+
+func TestManager_SecretFilesState_RoundTrip(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := NewManagerWithDir(tmpDir)
+
+	state := &SecretFilesState{
+		ContextName: "test-context",
+		Files: map[string]SecretFileEntry{
+			"KUBECONFIG": {
+				Path:     "/dev/shm/ctx-test-KUBECONFIG-12345",
+				EnvVar:   "KUBECONFIG",
+				Provider: "onepassword",
+			},
+			"SSH_KEY": {
+				Path:     "/dev/shm/ctx-test-SSH_KEY-67890",
+				EnvVar:   "SSH_KEY",
+				Provider: "bitwarden",
+			},
+		},
+	}
+
+	// Save
+	if err := m.SaveSecretFilesState(state); err != nil {
+		t.Fatalf("SaveSecretFilesState() error = %v", err)
+	}
+
+	// Load
+	loaded, err := m.LoadSecretFilesState("test-context")
+	if err != nil {
+		t.Fatalf("LoadSecretFilesState() error = %v", err)
+	}
+	if loaded == nil {
+		t.Fatal("LoadSecretFilesState() returned nil")
+	}
+
+	if loaded.ContextName != state.ContextName {
+		t.Errorf("ContextName = %v, want %v", loaded.ContextName, state.ContextName)
+	}
+	if len(loaded.Files) != 2 {
+		t.Errorf("Files count = %d, want 2", len(loaded.Files))
+	}
+	if loaded.Files["KUBECONFIG"].Provider != "onepassword" {
+		t.Errorf("KUBECONFIG provider = %v, want onepassword", loaded.Files["KUBECONFIG"].Provider)
+	}
+	if loaded.Files["SSH_KEY"].Provider != "bitwarden" {
+		t.Errorf("SSH_KEY provider = %v, want bitwarden", loaded.Files["SSH_KEY"].Provider)
+	}
+}
+
+func TestManager_SecretFilesState_LoadNonExistent(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := NewManagerWithDir(tmpDir)
+
+	loaded, err := m.LoadSecretFilesState("nonexistent")
+	if err != nil {
+		t.Fatalf("LoadSecretFilesState() error = %v", err)
+	}
+	if loaded != nil {
+		t.Error("LoadSecretFilesState() should return nil for non-existent state")
+	}
+}
+
+func TestManager_CleanupSecretFiles(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := NewManagerWithDir(tmpDir)
+
+	// Create temp files to simulate secret files
+	secretFile1 := filepath.Join(tmpDir, "secret1.txt")
+	secretFile2 := filepath.Join(tmpDir, "secret2.txt")
+	os.WriteFile(secretFile1, []byte("secret-content-1"), 0o600)
+	os.WriteFile(secretFile2, []byte("secret-content-2"), 0o600)
+
+	// Save state
+	state := &SecretFilesState{
+		ContextName: "cleanup-test",
+		Files: map[string]SecretFileEntry{
+			"VAR1": {Path: secretFile1, EnvVar: "VAR1", Provider: "bitwarden"},
+			"VAR2": {Path: secretFile2, EnvVar: "VAR2", Provider: "vault"},
+		},
+	}
+	if err := m.SaveSecretFilesState(state); err != nil {
+		t.Fatalf("SaveSecretFilesState() error = %v", err)
+	}
+
+	// Cleanup
+	if err := m.CleanupSecretFiles("cleanup-test"); err != nil {
+		t.Fatalf("CleanupSecretFiles() error = %v", err)
+	}
+
+	// Verify files are deleted
+	if _, err := os.Stat(secretFile1); !os.IsNotExist(err) {
+		t.Error("Secret file 1 should be deleted")
+	}
+	if _, err := os.Stat(secretFile2); !os.IsNotExist(err) {
+		t.Error("Secret file 2 should be deleted")
+	}
+
+	// Verify state file is deleted
+	loaded, err := m.LoadSecretFilesState("cleanup-test")
+	if err != nil {
+		t.Fatalf("LoadSecretFilesState() error = %v", err)
+	}
+	if loaded != nil {
+		t.Error("State should be cleaned up")
+	}
+}
+
+func TestManager_CleanupSecretFiles_NoState(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := NewManagerWithDir(tmpDir)
+
+	// Should not error when no state exists
+	if err := m.CleanupSecretFiles("nonexistent"); err != nil {
+		t.Errorf("CleanupSecretFiles() should not error on non-existent state, got: %v", err)
 	}
 }
 
