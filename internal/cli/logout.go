@@ -157,6 +157,11 @@ func runLogout(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// 9. Clean up secret files
+	if err := mgr.CleanupSecretFiles(contextName); err != nil {
+		yellow.Fprintf(os.Stderr, "⚠ Failed to clean up secret files: %v\n", err)
+	}
+
 	// If this was the current context, clear state files
 	if os.Getenv("CTX_CURRENT") == contextName {
 		if err := mgr.ClearCurrentContext(); err != nil {

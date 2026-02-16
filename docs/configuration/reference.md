@@ -180,7 +180,25 @@ secrets:
     ENV_VAR_NAME: "item-name"     # 1Password item name
   vault:
     ENV_VAR_NAME: "path#field"    # Vault path and field
+
+  # Secret files: fetch secret content, write to a secure temp file,
+  # export the file path as an env var. Cleaned up on deactivate.
+  files:
+    KUBECONFIG:                   # Env var that will hold the temp file path
+      onepassword: "My K8s Cluster/kubeconfig"
+    SSH_KEY:
+      bitwarden: "Deploy SSH Key#notes"
 ```
+
+### Secret Files
+
+The `secrets.files` section fetches secret content from any supported provider and writes it to a secure temporary file (`/dev/shm` on Linux, system temp directory on macOS). The env var is set to the file path, not the content itself.
+
+This is useful for kubeconfig files, SSH keys, TLS certificates, or anything that tools expect as a file path rather than an inline value. Files are created with `0600` permissions and securely deleted (zero-filled) on `ctx deactivate`.
+
+Each entry must specify exactly one provider: `bitwarden`, `onepassword`, `vault`, `aws_secrets_manager`, `aws_ssm`, or `gcp_secret_manager`.
+
+Secret file paths are added to `env:` after resolution, so they participate in variable interpolation. For example, `${KUBECONFIG}` in `kubernetes.kubeconfig` will resolve to the temp file path.
 
 See [Secrets Management](../secrets/index.md) for details.
 

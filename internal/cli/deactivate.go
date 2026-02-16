@@ -183,6 +183,11 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	// Clean up secret files
+	if err := mgr.CleanupSecretFiles(currentContext); err != nil {
+		yellow.Fprintf(os.Stderr, "⚠ Failed to clean up secret files: %v\n", err)
+	}
+
 	fmt.Fprintln(os.Stderr)
 	green.Fprintf(os.Stderr, "✓ Context '%s' deactivated.\n", currentContext)
 	fmt.Fprintln(os.Stderr)

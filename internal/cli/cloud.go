@@ -479,7 +479,7 @@ func convertCloudContext(shared *cloud.SharedContext) (*config.ContextConfig, er
 	}
 
 	// Then convert JSON to YAML-compatible map
-	var configMap map[string]interface{}
+	var configMap map[string]any
 	if err := json.Unmarshal(configJSON, &configMap); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal config: %w", err)
 	}

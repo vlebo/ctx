@@ -263,6 +263,17 @@ const (
 	BrowserFirefox BrowserType = "firefox"
 )
 
+// SecretFileSource specifies which secret provider to use for a secret file.
+// Exactly one provider field must be set.
+type SecretFileSource struct {
+	Bitwarden         string `yaml:"bitwarden,omitempty" mapstructure:"bitwarden"`
+	OnePassword       string `yaml:"onepassword,omitempty" mapstructure:"onepassword"`
+	Vault             string `yaml:"vault,omitempty" mapstructure:"vault"`
+	AWSSecretsManager string `yaml:"aws_secrets_manager,omitempty" mapstructure:"aws_secrets_manager"`
+	AWSSSM            string `yaml:"aws_ssm,omitempty" mapstructure:"aws_ssm"`
+	GCPSecretManager  string `yaml:"gcp_secret_manager,omitempty" mapstructure:"gcp_secret_manager"`
+}
+
 // SecretsConfig holds configuration for fetching secrets from various providers.
 // Each provider has its own sub-section with ENV_VAR: "item-name" mappings.
 type SecretsConfig struct {
@@ -274,6 +285,8 @@ type SecretsConfig struct {
 	AWSSecretsManager map[string]string `yaml:"aws_secrets_manager,omitempty" mapstructure:"aws_secrets_manager"` // ENV_VAR: "secret-name" or "secret-name#json-key"
 	AWSSSM            map[string]string `yaml:"aws_ssm,omitempty" mapstructure:"aws_ssm"`                         // ENV_VAR: "/param/path"
 	GCPSecretManager  map[string]string `yaml:"gcp_secret_manager,omitempty" mapstructure:"gcp_secret_manager"`   // ENV_VAR: "secret-name" or "projects/p/secrets/s/versions/v"
+	// Secret Files: fetch secret content and write to a secure temp file, export file path as env var
+	Files map[string]SecretFileSource `yaml:"files,omitempty" mapstructure:"files"` // ENV_VAR: SecretFileSource
 }
 
 // BrowserConfig holds browser profile configuration.

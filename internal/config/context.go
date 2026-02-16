@@ -242,6 +242,9 @@ func FormatContextDetails(ctx *ContextConfig) string {
 				sb.WriteString(fmt.Sprintf("  GCP Secret Manager: %d item(s)\n", len(ctx.Secrets.GCPSecretManager)))
 			}
 		}
+		if len(ctx.Secrets.Files) > 0 {
+			sb.WriteString(fmt.Sprintf("  Secret Files: %d file(s)\n", len(ctx.Secrets.Files)))
+		}
 	}
 
 	// Git Identity
@@ -350,6 +353,37 @@ func ValidateContext(ctx *ContextConfig) error {
 	if len(ctx.Tunnels) > 0 {
 		if ctx.SSH == nil || ctx.SSH.Bastion.Host == "" {
 			return fmt.Errorf("SSH bastion must be configured when tunnels are defined")
+		}
+	}
+
+	// Validate secret files
+	if ctx.Secrets != nil && len(ctx.Secrets.Files) > 0 {
+		for envVar, src := range ctx.Secrets.Files {
+			count := 0
+			if src.Bitwarden != "" {
+				count++
+			}
+			if src.OnePassword != "" {
+				count++
+			}
+			if src.Vault != "" {
+				count++
+			}
+			if src.AWSSecretsManager != "" {
+				count++
+			}
+			if src.AWSSSM != "" {
+				count++
+			}
+			if src.GCPSecretManager != "" {
+				count++
+			}
+			if count == 0 {
+				return fmt.Errorf("secrets.files.%s: no provider specified", envVar)
+			}
+			if count > 1 {
+				return fmt.Errorf("secrets.files.%s: exactly one provider must be specified, found %d", envVar, count)
+			}
 		}
 	}
 

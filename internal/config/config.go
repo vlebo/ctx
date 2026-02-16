@@ -187,7 +187,7 @@ func (m *Manager) LoadContext(name string) (*ContextConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	expandConfigVars(cfg)
+	ExpandConfigVars(cfg)
 	return cfg, nil
 }
 
@@ -565,10 +565,10 @@ func expandPath(path string) string {
 	return path
 }
 
-// expandConfigVars expands ${VAR} references in all string fields of a ContextConfig
+// ExpandConfigVars expands ${VAR} references in all string fields of a ContextConfig
 // using the env: map as the variable source. This enables template-based configs
 // where child contexts set variables that get expanded in inherited parent values.
-func expandConfigVars(cfg *ContextConfig) {
+func ExpandConfigVars(cfg *ContextConfig) {
 	if len(cfg.Env) == 0 {
 		return
 	}
@@ -637,6 +637,94 @@ func expandStructVars(v reflect.Value, vars map[string]string, fieldName string)
 			}
 		}
 	}
+}
+
+// SecretFileEntry represents a single secret file written to disk.
+type SecretFileEntry struct {
+	Path      string    `json:"path"`
+	EnvVar    string    `json:"env_var"`
+	Provider  string    `json:"provider"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+// SecretFilesState represents the persisted state of secret files for a context.
+type SecretFilesState struct {
+	ContextName string                     `json:"context_name"`
+	CreatedAt   time.Time                  `json:"created_at"`
+	Files       map[string]SecretFileEntry `json:"files"` // keyed by env var name
+}
+
+// SecretFilesStateDir returns the directory for storing secret files state.
+func (m *Manager) SecretFilesStateDir() string {
+	return filepath.Join(m.stateDir, "secret-files")
+}
+
+// SaveSecretFilesState persists the secret files state for a context.
+func (m *Manager) SaveSecretFilesState(state *SecretFilesState) error {
+	dir := m.SecretFilesStateDir()
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("failed to create secret-files state dir: %w", err)
+	}
+
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal secret files state: %w", err)
+	}
+
+	statePath := filepath.Join(dir, state.ContextName+".json")
+	if err := os.WriteFile(statePath, data, 0o600); err != nil {
+		return fmt.Errorf("failed to write secret files state: %w", err)
+	}
+	return nil
+}
+
+// LoadSecretFilesState loads the secret files state for a context.
+// Returns nil, nil if no state file exists.
+func (m *Manager) LoadSecretFilesState(contextName string) (*SecretFilesState, error) {
+	statePath := filepath.Join(m.SecretFilesStateDir(), contextName+".json")
+
+	data, err := os.ReadFile(statePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to read secret files state: %w", err)
+	}
+
+	var state SecretFilesState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return nil, fmt.Errorf("failed to parse secret files state: %w", err)
+	}
+	return &state, nil
+}
+
+// CleanupSecretFiles securely deletes all secret files for a context and removes the state file.
+func (m *Manager) CleanupSecretFiles(contextName string) error {
+	state, err := m.LoadSecretFilesState(contextName)
+	if err != nil {
+		return err
+	}
+	if state == nil {
+		return nil // No secret files to clean up
+	}
+
+	for _, entry := range state.Files {
+		// Zero-fill the file before removing
+		if info, err := os.Stat(entry.Path); err == nil {
+			size := info.Size()
+			if size > 0 {
+				zeros := make([]byte, size)
+				os.WriteFile(entry.Path, zeros, 0o600)
+			}
+		}
+		os.Remove(entry.Path)
+	}
+
+	// Remove the state file
+	statePath := filepath.Join(m.SecretFilesStateDir(), contextName+".json")
+	os.Remove(statePath)
+
+	return nil
 }
 
 // ClearCurrentContext clears the current context.
