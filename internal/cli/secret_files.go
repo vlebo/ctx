@@ -145,6 +145,10 @@ func getSecretTempDir() string {
 // writeSecretFile writes secret content to a temp file with restrictive permissions.
 // Returns the path to the created file.
 func writeSecretFile(dir, contextName, envVar, content string) (string, error) {
+	// Some CLIs (notably 1Password's `op`) wrap multiline content in double quotes.
+	// Strip surrounding quotes so the file contains the raw secret content.
+	content = stripSurroundingQuotes(content)
+
 	pattern := fmt.Sprintf("ctx-%s-%s-*", contextName, envVar)
 	f, err := os.CreateTemp(dir, pattern)
 	if err != nil {
@@ -164,6 +168,15 @@ func writeSecretFile(dir, contextName, envVar, content string) (string, error) {
 	}
 
 	return f.Name(), nil
+}
+
+// stripSurroundingQuotes removes a matching pair of double quotes wrapping the content.
+// This handles CLI tools that quote multiline output (e.g., 1Password's `op --fields`).
+func stripSurroundingQuotes(s string) string {
+	if len(s) >= 2 && s[0] == '"' && s[len(s)-1] == '"' {
+		return s[1 : len(s)-1]
+	}
+	return s
 }
 
 // secureDeleteFile zeros out a file's content before removing it.

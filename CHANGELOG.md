@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.8] - 2026-02-17
+
+### Bug Fixes
+
+- **Secret Files Quote Stripping**: Strip surrounding double quotes from secret file content. The 1Password CLI wraps multiline field values in quotes, causing generated temp files (e.g. kubeconfig) to be invalid.
+
+## [0.1.7] - 2026-02-17
+
+### Features
+
+- **Secret Files**: New `secrets.files` config to fetch secrets from any provider and write them as secure temp files. Ideal for kubeconfigs, SSH keys, TLS certs, or anything that needs to be a file rather than an env var.
+  - Files are written to `/dev/shm` (Linux) or `$TMPDIR` (macOS) with `0600` permissions
+  - File paths are exported as environment variables (e.g. `KUBECONFIG`)
+  - Files are zero-filled and deleted on `ctx deactivate` or `ctx logout`
+  - Works with all secret providers: Vault, 1Password, Bitwarden, AWS Secrets Manager, AWS SSM, GCP Secret Manager
+  - Supports variable interpolation: use `${KUBECONFIG}` in other config fields to reference the temp file path
+
 ## [0.1.6] - 2026-02-06
 
 ### Features
