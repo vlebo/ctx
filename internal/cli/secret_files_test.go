@@ -190,6 +190,54 @@ func TestGetSecretFileProvider(t *testing.T) {
 	}
 }
 
+func TestStripSurroundingQuotes(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"no quotes", "apiVersion: v1\nkind: Config\n", "apiVersion: v1\nkind: Config\n"},
+		{"quoted multiline", "\"apiVersion: v1\nkind: Config\n\"", "apiVersion: v1\nkind: Config\n"},
+		{"empty string", "", ""},
+		{"only quotes", "\"\"", ""},
+		{"single quote char", "\"", "\""},
+		{"mismatched quotes", "\"hello", "\"hello"},
+		{"single char", "a", "a"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := stripSurroundingQuotes(tt.input)
+			if got != tt.want {
+				t.Errorf("stripSurroundingQuotes(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestWriteSecretFile_StripsQuotes(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Simulate 1Password CLI output wrapping multiline content in quotes
+	quotedContent := "\"apiVersion: v1\nkind: Config\n\""
+
+	path, err := writeSecretFile(tmpDir, "test-ctx", "KUBECONFIG", quotedContent)
+	if err != nil {
+		t.Fatalf("writeSecretFile() error = %v", err)
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("Failed to read file: %v", err)
+	}
+
+	want := "apiVersion: v1\nkind: Config\n"
+	if string(content) != want {
+		t.Errorf("File content = %q, want %q (quotes should be stripped)", string(content), want)
+	}
+}
+
+
 func containsStr(s, substr string) bool {
 	for i := 0; i <= len(s)-len(substr); i++ {
 		if s[i:i+len(substr)] == substr {
