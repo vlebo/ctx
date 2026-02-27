@@ -38,6 +38,7 @@ Switch between AWS profiles, Kubernetes clusters, VPN connections, and SSH tunne
 | **Identity** | Per-context Git user configuration |
 | **Registries** | Docker and NPM registry configuration |
 | **Browser** | Chrome/Firefox profile per context for SSO workflows |
+| **Editor/IDE** | Per-context VS Code, Sublime, Vim/Neovim workspace support |
 | **Shell** | Per-shell contexts, colored prompts, environment isolation |
 | **Inheritance** | Base/abstract contexts with multi-level inheritance |
 

@@ -195,6 +195,19 @@ ctx browser open                 # Open browser
 ctx browser open https://example.com  # Open URL
 ```
 
+## Editor
+
+### `ctx edit`
+
+Open workspace in the configured editor.
+
+```bash
+ctx edit                         # Open workspace
+ctx edit main.go                 # Open specific file
+```
+
+Requires an active context with `editor` configured. VS Code and Sublime run detached; Vim runs in the foreground.
+
 ## Quick URLs
 
 ### `ctx open [name]`

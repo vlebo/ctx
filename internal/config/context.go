@@ -302,6 +302,15 @@ func FormatContextDetails(ctx *ContextConfig) string {
 		}
 	}
 
+	// Editor
+	if ctx.Editor != nil {
+		sb.WriteString("\nEditor:\n")
+		sb.WriteString(fmt.Sprintf("  Type: %s\n", ctx.Editor.Type))
+		if ctx.Editor.Workspace != "" {
+			sb.WriteString(fmt.Sprintf("  Workspace: %s\n", ctx.Editor.Workspace))
+		}
+	}
+
 	// Proxy
 	if ctx.Proxy != nil {
 		sb.WriteString("\nProxy:\n")

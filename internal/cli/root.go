@@ -48,6 +48,7 @@ forwarding for tunnel access to remote services.`,
 	rootCmd.AddCommand(newVPNCmd())
 	rootCmd.AddCommand(newOpenCmd())
 	rootCmd.AddCommand(newBrowserCmd())
+	rootCmd.AddCommand(newEditCmd())
 	rootCmd.AddCommand(newInitCmd())
 	rootCmd.AddCommand(newShellHookCmd())
 	rootCmd.AddCommand(newCloudCmd())
