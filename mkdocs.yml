@@ -59,6 +59,7 @@ nav:
       - VPN: features/vpn.md
       - SSH Tunnels: features/tunnels.md
       - Browser Profiles: features/browser.md
+      - Editor/IDE: features/editor.md
       - Proxy: features/proxy.md
   - CLI Reference: commands.md
   - Environment Variables: environment.md

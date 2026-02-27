@@ -262,6 +262,33 @@ browser:
 
 See [Browser Profiles](../features/browser.md) for details.
 
+## Editor
+
+```yaml
+editor:
+  type: string              # vscode, sublime, or vim
+  workspace: string         # Path to workspace file or directory (optional)
+```
+
+The `editor` section configures a per-context editor/IDE so `ctx edit` opens your project in the right editor with the right workspace.
+
+**Supported editors:**
+
+| Type | Binary lookup | Workspace |
+|------|--------------|-----------|
+| `vscode` | `code` → `code-insiders` → macOS app path | `.code-workspace` file |
+| `sublime` | `subl` → macOS app path | `.sublime-project` file |
+| `vim` | `nvim` → `vim` | `.vim` session file or directory |
+
+**Commands:**
+
+- `ctx edit` — open the workspace in the configured editor
+- `ctx edit <file>` — open a specific file
+
+Vim runs in the foreground (terminal); VSCode and Sublime run detached.
+
+This does NOT set `EDITOR` or `VISUAL` environment variables to avoid clobbering global preferences.
+
 ## URLs
 
 ```yaml

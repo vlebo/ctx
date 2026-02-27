@@ -1158,6 +1158,22 @@ func printSwitchSuccess(ctx *config.ContextConfig, failures []string) {
 		fmt.Println("Proxy settings configured")
 	}
 
+	// Browser
+	if ctx.Browser != nil {
+		green.Print("✓ ")
+		fmt.Printf("Browser: %s (%s)\n", ctx.Browser.Type, ctx.Browser.Profile)
+	}
+
+	// Editor
+	if ctx.Editor != nil {
+		green.Print("✓ ")
+		fmt.Printf("Editor: %s", ctx.Editor.Type)
+		if ctx.Editor.Workspace != "" {
+			fmt.Printf(" (%s)", ctx.Editor.Workspace)
+		}
+		fmt.Println()
+	}
+
 	// Secrets
 	if ctx.Secrets != nil && !failed("Secrets") {
 		totalSecrets := len(ctx.Secrets.Bitwarden) + len(ctx.Secrets.OnePassword) + len(ctx.Secrets.Vault) +

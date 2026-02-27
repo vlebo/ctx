@@ -1,0 +1,31 @@
+# Example: Context with editor/IDE configuration
+# Use 'ctx edit' to open the workspace in the configured editor
+
+name: myproject-dev
+description: "Development environment with VS Code workspace"
+environment: development
+
+aws:
+  profile: myproject-dev
+  region: us-west-2
+
+editor:
+  type: vscode
+  workspace: ~/projects/myproject.code-workspace
+
+# --- Other editor examples ---
+
+# Sublime Text:
+#   editor:
+#     type: sublime
+#     workspace: ~/projects/myproject.sublime-project
+
+# Vim with session file:
+#   editor:
+#     type: vim
+#     workspace: ~/projects/myproject.vim
+
+# Vim with project directory:
+#   editor:
+#     type: vim
+#     workspace: ~/projects/myproject

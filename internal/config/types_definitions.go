@@ -295,6 +295,21 @@ type BrowserConfig struct {
 	Profile string      `yaml:"profile" mapstructure:"profile"`
 }
 
+// EditorType represents the type of editor/IDE.
+type EditorType string
+
+const (
+	EditorVSCode  EditorType = "vscode"
+	EditorSublime EditorType = "sublime"
+	EditorVim     EditorType = "vim"
+)
+
+// EditorConfig holds editor/IDE configuration for per-context workspace management.
+type EditorConfig struct {
+	Type      EditorType `yaml:"type" mapstructure:"type"`
+	Workspace string     `yaml:"workspace,omitempty" mapstructure:"workspace"`
+}
+
 // ContextConfig represents a complete context configuration.
 type ContextConfig struct {
 	// Cloud Providers
@@ -322,6 +337,8 @@ type ContextConfig struct {
 	Proxy *ProxyConfig `yaml:"proxy,omitempty" mapstructure:"proxy"`
 	// Browser
 	Browser *BrowserConfig `yaml:"browser,omitempty" mapstructure:"browser"`
+	// Editor/IDE
+	Editor *EditorConfig `yaml:"editor,omitempty" mapstructure:"editor"`
 	// Custom Environment Variables
 	Env map[string]string `yaml:"env,omitempty" mapstructure:"env"`
 	// URLs for quick access (ctx open)
@@ -405,6 +422,9 @@ func (c *ContextConfig) GetExtras() []string {
 	}
 	if c.Proxy != nil {
 		extras = append(extras, "proxy")
+	}
+	if c.Editor != nil {
+		extras = append(extras, "editor")
 	}
 	return extras
 }
