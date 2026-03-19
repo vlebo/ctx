@@ -15,7 +15,7 @@ import (
 )
 
 // switchVPN connects to VPN based on configuration.
-func switchVPN(cfg *config.VPNConfig) error {
+func switchVPN(cfg *config.VPNConfig, browser *config.BrowserConfig) error {
 	if cfg == nil {
 		return nil
 	}
@@ -27,6 +27,8 @@ func switchVPN(cfg *config.VPNConfig) error {
 		return switchWireGuard(cfg)
 	case config.VPNTypeTailscale:
 		return switchTailscale(cfg)
+	case config.VPNTypeNetbird:
+		return switchNetbird(cfg, browser)
 	case config.VPNTypeCustom:
 		return switchCustomVPN(cfg)
 	default:
@@ -172,6 +174,80 @@ func switchTailscale(cfg *config.VPNConfig) error {
 	return nil
 }
 
+func switchNetbird(cfg *config.VPNConfig, browser *config.BrowserConfig) error {
+	if _, err := exec.LookPath("netbird"); err != nil {
+		return fmt.Errorf("netbird command not found in PATH")
+	}
+
+	// NetBird only supports a single connection. If already connected (possibly
+	// to a different management server), disconnect first so we can reconnect
+	// with the correct parameters.
+	cmd := exec.Command("netbird", "status")
+	if output, err := cmd.Output(); err == nil && strings.Contains(string(output), "Management: Connected") {
+		down := exec.Command("netbird", "down")
+		if err := down.Run(); err != nil {
+			down = exec.Command("sudo", "netbird", "down")
+			down.Run()
+		}
+	}
+
+	// Ensure the profile exists before connecting
+	if cfg.Profile != "" {
+		// Check if profile exists by listing profiles
+		listCmd := exec.Command("netbird", "profile", "list")
+		if output, err := listCmd.Output(); err == nil {
+			if !strings.Contains(string(output), cfg.Profile) {
+				// Profile doesn't exist, create it
+				addCmd := exec.Command("netbird", "profile", "add", cfg.Profile)
+				if err := addCmd.Run(); err != nil {
+					addCmd = exec.Command("sudo", "netbird", "profile", "add", cfg.Profile)
+					addCmd.Run()
+				}
+			}
+		}
+	}
+
+	args := []string{"up"}
+	if cfg.Profile != "" {
+		args = append(args, "--profile", cfg.Profile)
+	}
+	if cfg.ManagementURL != "" {
+		args = append(args, "--management-url", cfg.ManagementURL)
+	}
+	if cfg.SetupKey != "" {
+		args = append(args, "--setup-key", cfg.SetupKey)
+	}
+
+	// Set BROWSER env var to use the configured browser profile for NetBird SSO auth
+	// (not needed when setup_key is provided — authentication is headless)
+	var extraEnv []string
+	if browser != nil && cfg.SetupKey == "" {
+		browserCmd := getBrowserCommand(browser)
+		if browserCmd != "" {
+			extraEnv = append(extraEnv, "BROWSER="+browserCmd)
+		}
+	}
+
+	// Try without sudo first
+	cmd = exec.Command("netbird", args...)
+	if len(extraEnv) > 0 {
+		cmd.Env = append(os.Environ(), extraEnv...)
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		// Try with sudo
+		cmd = exec.Command("sudo", append([]string{"netbird"}, args...)...)
+		if len(extraEnv) > 0 {
+			cmd.Env = append(os.Environ(), extraEnv...)
+		}
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+	return nil
+}
+
 func switchCustomVPN(cfg *config.VPNConfig) error {
 	if cfg.ConnectCmd == "" {
 		return fmt.Errorf("custom VPN connect_cmd is required")
@@ -230,6 +306,13 @@ func disconnectVPN(cfg *config.VPNConfig) error {
 		if err := cmd.Run(); err != nil {
 			// Try with sudo
 			cmd = exec.Command("sudo", "tailscale", "down")
+			cmd.Run() // Ignore errors - might already be disconnected
+		}
+		return nil
+	case config.VPNTypeNetbird:
+		cmd := exec.Command("netbird", "down")
+		if err := cmd.Run(); err != nil {
+			cmd = exec.Command("sudo", "netbird", "down")
 			cmd.Run() // Ignore errors - might already be disconnected
 		}
 		return nil
@@ -508,6 +591,14 @@ func checkAnyVPNRunning(expected *config.VPNConfig) string {
 		}
 	}
 
+	// Check netbird
+	cmd = exec.Command("netbird", "status")
+	if output, err := cmd.Output(); err == nil {
+		if strings.Contains(string(output), "Management: Connected") {
+			return "netbird"
+		}
+	}
+
 	return ""
 }
 
@@ -531,6 +622,12 @@ func checkVPNStatus(cfg *config.VPNConfig) bool {
 		cmd := exec.Command("tailscale", "status", "--json")
 		output, err := cmd.Output()
 		if err == nil && strings.Contains(string(output), `"BackendState":"Running"`) {
+			return true
+		}
+	case config.VPNTypeNetbird:
+		cmd := exec.Command("netbird", "status")
+		output, err := cmd.Output()
+		if err == nil && strings.Contains(string(output), "Management: Connected") {
 			return true
 		}
 	case config.VPNTypeOpenVPN:

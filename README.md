@@ -34,7 +34,7 @@ $ ctx use acme-prod
 | **Cloud Providers** | AWS, GCP, Azure profile switching with auto-login support |
 | **Orchestration** | Kubernetes, Nomad, Consul context management |
 | **Networking** | SSH tunnels with auto-reconnect, per-tunnel management |
-| **VPN** | OpenVPN, WireGuard, Tailscale, custom commands |
+| **VPN** | OpenVPN, WireGuard, Tailscale, NetBird, custom commands |
 | **Secrets** | Bitwarden, 1Password, Vault, AWS Secrets Manager, AWS SSM, GCP Secret Manager |
 | **Identity** | Per-context Git user configuration |
 | **Registries** | Docker and NPM registry configuration |
@@ -96,7 +96,7 @@ Full documentation is available at **[vlebo.github.io/ctx](https://vlebo.github.
 - [CLI Reference](https://vlebo.github.io/ctx/commands/) - All available commands
 - [AWS Setup](https://vlebo.github.io/ctx/cloud/aws/) - SSO, aws-vault, Secrets Manager
 - [Secrets Management](https://vlebo.github.io/ctx/secrets/) - Bitwarden, 1Password, Vault, and more
-- [VPN](https://vlebo.github.io/ctx/features/vpn/) - OpenVPN, WireGuard, Tailscale
+- [VPN](https://vlebo.github.io/ctx/features/vpn/) - OpenVPN, WireGuard, Tailscale, NetBird
 - [SSH Tunnels](https://vlebo.github.io/ctx/features/tunnels/) - Auto-connect tunnels
 - [Tips & Best Practices](https://vlebo.github.io/ctx/guides/tips/) - Production safety, credential isolation
 

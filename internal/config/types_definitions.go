@@ -140,6 +140,7 @@ const (
 	VPNTypeOpenVPN   VPNType = "openvpn"
 	VPNTypeWireGuard VPNType = "wireguard"
 	VPNTypeTailscale VPNType = "tailscale"
+	VPNTypeNetbird   VPNType = "netbird"
 	VPNTypeCustom    VPNType = "custom"
 )
 
@@ -153,6 +154,10 @@ type VPNConfig struct {
 	Interface string `yaml:"interface,omitempty" mapstructure:"interface"`
 	// Tailscale
 	ExitNode string `yaml:"exit_node,omitempty" mapstructure:"exit_node"`
+	// NetBird
+	ManagementURL string `yaml:"management_url,omitempty" mapstructure:"management_url"`
+	SetupKey      string `yaml:"setup_key,omitempty" mapstructure:"setup_key"`
+	Profile       string `yaml:"profile,omitempty" mapstructure:"profile"`
 	// Custom commands
 	ConnectCmd    string `yaml:"connect_cmd,omitempty" mapstructure:"connect_cmd"`
 	DisconnectCmd string `yaml:"disconnect_cmd,omitempty" mapstructure:"disconnect_cmd"`
