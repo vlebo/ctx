@@ -1,12 +1,12 @@
 # VPN
 
-ctx can automatically connect and disconnect VPN when switching contexts. Supports OpenVPN, WireGuard, Tailscale, and custom VPN solutions.
+ctx can automatically connect and disconnect VPN when switching contexts. Supports OpenVPN, WireGuard, Tailscale, NetBird, and custom VPN solutions.
 
 ## Configuration
 
 ```yaml
 vpn:
-  type: openvpn                   # openvpn, wireguard, tailscale, custom
+  type: openvpn                   # openvpn, wireguard, tailscale, netbird, custom
   config_file: ~/vpn/myproject.ovpn
   auto_connect: true              # Connect automatically on context switch
   auto_disconnect: true           # Disconnect when switching away
@@ -45,6 +45,24 @@ vpn:
   exit_node: us-west-1              # Optional exit node
   auto_connect: true
 ```
+
+### NetBird
+
+```yaml
+vpn:
+  type: netbird
+  profile: my-profile                      # Optional, NetBird client profile name
+  management_url: https://vpn.example.com  # Optional, for self-hosted NetBird
+  setup_key: "XXXXXXXX-XXXX-..."           # Optional, for headless auth
+  auto_connect: true
+```
+
+NetBird is an open-source WireGuard-based VPN/network mesh tool. Supports both [NetBird Cloud](https://netbird.io) and self-hosted instances. The `management_url` option specifies the management server (defaults to NetBird Cloud if omitted). The `setup_key` enables headless/automated authentication. The `profile` field maps to `netbird up --profile` for switching between different NetBird accounts.
+
+ctx automatically creates NetBird profiles if they don't exist, and handles the disconnect/reconnect cycle when switching between contexts.
+
+!!! note "Switching between NetBird servers"
+    NetBird only supports one active connection at a time. If you switch between different NetBird servers (e.g., self-hosted and cloud), use separate **profiles** — each profile stores its own management URL, keys, and auth state. Create profiles with `netbird profile add <name>`, then set the `profile` field in each context. Always set `management_url` explicitly in **both** contexts when using different servers.
 
 ### Custom VPN
 

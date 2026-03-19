@@ -124,10 +124,13 @@ See [SSH Tunnels](../features/tunnels.md) for details.
 
 ```yaml
 vpn:
-  type: string              # openvpn, wireguard, tailscale, custom
+  type: string              # openvpn, wireguard, tailscale, netbird, custom
   config_file: string       # Path to VPN config file
   interface: string         # WireGuard interface name
   exit_node: string         # Tailscale exit node
+  management_url: string    # NetBird management URL (optional, for self-hosted)
+  setup_key: string         # NetBird setup key (optional)
+  profile: string           # NetBird client profile name (optional)
   connect_cmd: string       # Custom connect command
   disconnect_cmd: string    # Custom disconnect command
   status_cmd: string        # Custom status command

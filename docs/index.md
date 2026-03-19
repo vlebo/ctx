@@ -33,7 +33,7 @@ Switch between AWS profiles, Kubernetes clusters, VPN connections, and SSH tunne
 | **Cloud Providers** | AWS, GCP, Azure profile switching with auto-login support |
 | **Orchestration** | Kubernetes, Nomad, Consul context management |
 | **Networking** | SSH tunnels with auto-reconnect, per-tunnel management |
-| **VPN** | OpenVPN, WireGuard, Tailscale, custom commands |
+| **VPN** | OpenVPN, WireGuard, Tailscale, NetBird, custom commands |
 | **Secrets** | Bitwarden, 1Password, Vault, AWS Secrets Manager, AWS SSM, GCP Secret Manager |
 | **Identity** | Per-context Git user configuration |
 | **Registries** | Docker and NPM registry configuration |

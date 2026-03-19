@@ -35,9 +35,9 @@ func TestExpandPath(t *testing.T) {
 }
 
 func TestSwitchVPN_NilConfig(t *testing.T) {
-	err := switchVPN(nil)
+	err := switchVPN(nil, nil)
 	if err != nil {
-		t.Errorf("switchVPN(nil) = %v, want nil", err)
+		t.Errorf("switchVPN(nil, nil) = %v, want nil", err)
 	}
 }
 
@@ -46,7 +46,7 @@ func TestSwitchVPN_UnsupportedType(t *testing.T) {
 		Type: "unsupported",
 	}
 
-	err := switchVPN(cfg)
+	err := switchVPN(cfg, nil)
 	if err == nil {
 		t.Error("Expected error for unsupported VPN type")
 	}
@@ -57,7 +57,7 @@ func TestSwitchVPN_CustomWithoutCmd(t *testing.T) {
 		Type: config.VPNTypeCustom,
 	}
 
-	err := switchVPN(cfg)
+	err := switchVPN(cfg, nil)
 	if err == nil {
 		t.Error("Expected error for custom VPN without connect_cmd")
 	}
@@ -106,6 +106,22 @@ func TestSwitchOpenVPN_NoConfigFile(t *testing.T) {
 	err := switchOpenVPN(cfg)
 	if err == nil {
 		t.Error("Expected error when config_file is not set")
+	}
+}
+
+func TestSwitchNetbird_NoBinary(t *testing.T) {
+	// Ensure netbird is not in PATH
+	origPath := os.Getenv("PATH")
+	t.Setenv("PATH", "/nonexistent")
+	defer os.Setenv("PATH", origPath)
+
+	cfg := &config.VPNConfig{
+		Type: config.VPNTypeNetbird,
+	}
+
+	err := switchNetbird(cfg, nil)
+	if err == nil {
+		t.Error("Expected error when netbird is not in PATH")
 	}
 }
 

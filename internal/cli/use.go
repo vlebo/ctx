@@ -135,11 +135,11 @@ func switchContext(mgr *config.Manager, ctx *config.ContextConfig) ([]string, er
 
 	// Connect VPN first (if configured with auto_connect)
 	if ctx.VPN != nil && ctx.VPN.AutoConnect {
-		// Skip if this VPN is already connected
-		if checkVPNStatus(ctx.VPN) {
+		// NetBird always reconnects (forced down/up) to ensure correct profile/server
+		if ctx.VPN.Type != config.VPNTypeNetbird && checkVPNStatus(ctx.VPN) {
 			green := color.New(color.FgGreen)
 			green.Fprintf(os.Stderr, "✓ VPN already connected\n")
-		} else if err := switchVPN(ctx.VPN); err != nil {
+		} else if err := switchVPN(ctx.VPN, ctx.Browser); err != nil {
 			yellow.Fprintf(os.Stderr, "⚠ VPN connection failed: %v\n", err)
 			failures = append(failures, "VPN")
 		}

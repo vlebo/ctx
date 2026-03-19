@@ -72,7 +72,7 @@ func runVPNConnect(cmd *cobra.Command, args []string) error {
 	green := color.New(color.FgGreen)
 	fmt.Printf("Connecting to VPN (%s)...\n", ctx.VPN.Type)
 
-	if err := switchVPN(ctx.VPN); err != nil {
+	if err := switchVPN(ctx.VPN, ctx.Browser); err != nil {
 		// Send failure event
 		sendVPNEvent(mgr, ctx.Name, string(ctx.Environment), "vpn.connect", false, err.Error())
 		return fmt.Errorf("VPN connection failed: %w", err)
