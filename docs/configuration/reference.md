@@ -19,6 +19,7 @@ Complete reference for all context configuration options.
 
 ```yaml
 aws:
+  config: string            # Path to custom AWS config file (sets AWS_CONFIG_FILE)
   profile: string           # AWS CLI profile name
   region: string            # AWS region (us-east-1, eu-west-1, etc.)
   sso_login: bool           # Auto-run 'aws sso login' on context switch

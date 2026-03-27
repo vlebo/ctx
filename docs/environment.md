@@ -13,6 +13,7 @@ When you run `ctx use <name>`, these environment variables are set automatically
 
 | Variable | Description |
 |----------|-------------|
+| `AWS_CONFIG_FILE` | Custom AWS config file path (when `aws.config` is set) |
 | `AWS_PROFILE` | AWS CLI profile name (when not using aws-vault) |
 | `AWS_REGION` | AWS region |
 | `AWS_DEFAULT_REGION` | AWS default region |
