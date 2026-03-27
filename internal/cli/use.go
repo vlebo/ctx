@@ -487,8 +487,12 @@ func switchAWS(cfg *config.AWSConfig, browser *config.BrowserConfig, mgr *config
 
 		cmd := exec.Command("aws-vault", "exec", cfg.Profile, "--json")
 		// Set region for STS calls if configured
+		cmd.Env = os.Environ()
 		if cfg.Region != "" {
-			cmd.Env = append(os.Environ(), "AWS_REGION="+cfg.Region, "AWS_DEFAULT_REGION="+cfg.Region)
+			cmd.Env = append(cmd.Env, "AWS_REGION="+cfg.Region, "AWS_DEFAULT_REGION="+cfg.Region)
+		}
+		if cfg.Config != "" {
+			cmd.Env = append(cmd.Env, "AWS_CONFIG_FILE="+expandPath(cfg.Config))
 		}
 		output, err := cmd.Output()
 		if err != nil {
@@ -533,12 +537,19 @@ func switchAWS(cfg *config.AWSConfig, browser *config.BrowserConfig, mgr *config
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 
-		// Set BROWSER env var to use the configured browser profile
+		// Build custom environment if needed
+		var envOverrides []string
 		if browser != nil {
 			browserCmd := getBrowserCommand(browser)
 			if browserCmd != "" {
-				cmd.Env = append(os.Environ(), "BROWSER="+browserCmd)
+				envOverrides = append(envOverrides, "BROWSER="+browserCmd)
 			}
+		}
+		if cfg.Config != "" {
+			envOverrides = append(envOverrides, "AWS_CONFIG_FILE="+expandPath(cfg.Config))
+		}
+		if len(envOverrides) > 0 {
+			cmd.Env = append(os.Environ(), envOverrides...)
 		}
 
 		if err := cmd.Run(); err != nil {
@@ -954,6 +965,9 @@ func fetchEKSCredentials(eks *config.EKSConfig, aws *config.AWSConfig, kubeconfi
 
 	cmd := exec.Command("aws", args...)
 	cmd.Stderr = os.Stderr
+	if aws != nil && aws.Config != "" {
+		cmd.Env = append(os.Environ(), "AWS_CONFIG_FILE="+expandPath(aws.Config))
+	}
 
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("aws eks update-kubeconfig failed: %w", err)

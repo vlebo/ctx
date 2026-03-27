@@ -6,6 +6,7 @@ ctx supports three authentication methods for AWS, plus integration with AWS Sec
 
 ```yaml
 aws:
+  config: ~/.aws/config_myproject # Custom AWS config file (optional)
   profile: myproject-prod
   region: us-east-1
   sso_login: true                 # Auto-run 'aws sso login' on context switch
@@ -80,10 +81,25 @@ When you run `ctx use`, it will:
 - [aws-vault](https://github.com/99designs/aws-vault) must be installed
 - Profile must be configured in aws-vault: `aws-vault add myproject-prod`
 
+## Custom AWS Config File
+
+If you manage separate AWS config files per project or customer, use the `config` field to point to the right one:
+
+```yaml
+aws:
+  config: ~/.aws/config_customer1
+  profile: dev
+  region: eu-west-1
+  sso_login: true
+```
+
+This sets `AWS_CONFIG_FILE` so all AWS CLI commands (including SSO login, aws-vault, and EKS credential fetching) use the specified config file instead of the default `~/.aws/config`.
+
 ## Environment Variables Set
 
 | Variable | Description |
 |----------|-------------|
+| `AWS_CONFIG_FILE` | Custom AWS config file path (when `config` is set) |
 | `AWS_PROFILE` | AWS CLI profile name (when not using aws-vault) |
 | `AWS_REGION` | AWS region |
 | `AWS_DEFAULT_REGION` | AWS default region |

@@ -6,6 +6,7 @@ description: "ACME Production Environment"
 environment: production
 
 aws:
+  config: ~/.aws/config_acme      # Custom AWS config file (sets AWS_CONFIG_FILE)
   profile: acme-prod
   region: us-east-1
   sso_login: true                 # Auto-run 'aws sso login'
