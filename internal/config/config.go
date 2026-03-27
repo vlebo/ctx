@@ -388,6 +388,9 @@ func (m *Manager) GenerateEnvVars(ctx *ContextConfig) map[string]string {
 
 	// AWS
 	if ctx.AWS != nil {
+		if ctx.AWS.Config != "" {
+			envVars["AWS_CONFIG_FILE"] = expandPath(ctx.AWS.Config)
+		}
 		if ctx.AWS.Region != "" {
 			envVars["AWS_REGION"] = ctx.AWS.Region
 			envVars["AWS_DEFAULT_REGION"] = ctx.AWS.Region

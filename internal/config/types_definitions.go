@@ -37,6 +37,7 @@ const (
 
 // AWSConfig holds AWS-specific configuration.
 type AWSConfig struct {
+	Config   string `yaml:"config,omitempty" mapstructure:"config"`
 	Profile  string `yaml:"profile" mapstructure:"profile"`
 	Region   string `yaml:"region" mapstructure:"region"`
 	UseVault bool   `yaml:"use_vault" mapstructure:"use_vault"`
