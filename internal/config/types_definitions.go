@@ -213,6 +213,7 @@ type GitConfig struct {
 	UserEmail  string `yaml:"user_email,omitempty" mapstructure:"user_email"`
 	SigningKey string `yaml:"signing_key,omitempty" mapstructure:"signing_key"`
 	GPGSign    bool   `yaml:"gpg_sign,omitempty" mapstructure:"gpg_sign"`
+	SSHKey     string `yaml:"ssh_key,omitempty" mapstructure:"ssh_key"` // Path to SSH private key for Git operations
 }
 
 // DockerRegistryConfig holds Docker registry configuration.

@@ -412,44 +412,11 @@ func verifyVaultToken(cfg *config.VaultConfig, token string) bool {
 }
 
 // switchGit configures Git identity for the session.
+// All Git configuration is handled via environment variables (GIT_AUTHOR_NAME,
+// GIT_AUTHOR_EMAIL, GIT_COMMITTER_NAME, GIT_COMMITTER_EMAIL, GIT_SSH_COMMAND)
+// set in GenerateEnvVars. This avoids polluting ~/.gitconfig with global settings
+// that persist beyond the context session.
 func switchGit(cfg *config.GitConfig) error {
-	if cfg == nil {
-		return nil
-	}
-
-	if _, err := exec.LookPath("git"); err != nil {
-		return nil // Git not available
-	}
-
-	// Set git config globally for this session via environment variables
-	// This is handled in GenerateEnvVars, but we can also set them directly
-
-	if cfg.UserName != "" {
-		cmd := exec.Command("git", "config", "--global", "user.name", cfg.UserName)
-		if err := cmd.Run(); err != nil {
-			yellow := color.New(color.FgYellow)
-			yellow.Printf("⚠ Failed to set git user.name: %v\n", err)
-		}
-	}
-
-	if cfg.UserEmail != "" {
-		cmd := exec.Command("git", "config", "--global", "user.email", cfg.UserEmail)
-		if err := cmd.Run(); err != nil {
-			yellow := color.New(color.FgYellow)
-			yellow.Printf("⚠ Failed to set git user.email: %v\n", err)
-		}
-	}
-
-	if cfg.SigningKey != "" {
-		cmd := exec.Command("git", "config", "--global", "user.signingkey", cfg.SigningKey)
-		cmd.Run()
-	}
-
-	if cfg.GPGSign {
-		cmd := exec.Command("git", "config", "--global", "commit.gpgsign", "true")
-		cmd.Run()
-	}
-
 	return nil
 }
 

@@ -564,6 +564,47 @@ func TestManager_GenerateEnvVars_Kubernetes(t *testing.T) {
 	}
 }
 
+func TestManager_GenerateEnvVars_GitSSHKey(t *testing.T) {
+	tmpDir := t.TempDir()
+	m := NewManagerWithDir(tmpDir)
+
+	ctx := &ContextConfig{
+		Name: "git-ssh-test",
+		Git: &GitConfig{
+			UserName: "Test User",
+			UserEmail: "test@example.com",
+			SSHKey:   "/home/test/.ssh/work_key",
+		},
+	}
+
+	envVars := m.GenerateEnvVars(ctx)
+
+	if envVars["GIT_AUTHOR_NAME"] != "Test User" {
+		t.Errorf("envVars[GIT_AUTHOR_NAME] = %v, want Test User", envVars["GIT_AUTHOR_NAME"])
+	}
+	if envVars["GIT_AUTHOR_EMAIL"] != "test@example.com" {
+		t.Errorf("envVars[GIT_AUTHOR_EMAIL] = %v, want test@example.com", envVars["GIT_AUTHOR_EMAIL"])
+	}
+
+	expected := "ssh -i /home/test/.ssh/work_key -o IdentitiesOnly=yes"
+	if envVars["GIT_SSH_COMMAND"] != expected {
+		t.Errorf("envVars[GIT_SSH_COMMAND] = %v, want %v", envVars["GIT_SSH_COMMAND"], expected)
+	}
+
+	// Test without ssh_key - GIT_SSH_COMMAND should not be set
+	ctx2 := &ContextConfig{
+		Name: "git-no-ssh-test",
+		Git: &GitConfig{
+			UserName: "Test User",
+		},
+	}
+
+	envVars2 := m.GenerateEnvVars(ctx2)
+	if _, exists := envVars2["GIT_SSH_COMMAND"]; exists {
+		t.Errorf("envVars[GIT_SSH_COMMAND] should not be set when ssh_key is empty")
+	}
+}
+
 func TestManager_WriteEnvFile(t *testing.T) {
 	tmpDir := t.TempDir()
 	m := NewManagerWithDir(tmpDir)

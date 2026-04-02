@@ -71,6 +71,7 @@ See [HashiCorp Vault](secrets/vault.md) for details.
 | `GIT_AUTHOR_EMAIL` | Git commit author email |
 | `GIT_COMMITTER_NAME` | Git committer name |
 | `GIT_COMMITTER_EMAIL` | Git committer email |
+| `GIT_SSH_COMMAND` | SSH command with identity key for Git operations |
 
 ## Databases
 
