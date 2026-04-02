@@ -104,7 +104,8 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 			// Vault
 			"VAULT_ADDR", "VAULT_NAMESPACE", "VAULT_SKIP_VERIFY", "VAULT_TOKEN",
 			// Git
-			"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL",
+			"GIT_AUTHOR_NAME", "GIT_AUTHOR_EMAIL", "GIT_COMMITTER_NAME", "GIT_COMMITTER_EMAIL", "GIT_SSH_COMMAND",
+			"GIT_CONFIG_COUNT", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0", "GIT_CONFIG_KEY_1", "GIT_CONFIG_VALUE_1",
 			// Proxy
 			"HTTP_PROXY", "http_proxy", "HTTPS_PROXY", "https_proxy", "NO_PROXY", "no_proxy",
 			// Databases

@@ -19,6 +19,7 @@
 #
 # git:
 #   user_email: "you@acme.com"
+#   ssh_key: ~/.ssh/acme_ed25519
 #
 # urls:
 #   jira: https://acme.atlassian.net

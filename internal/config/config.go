@@ -494,6 +494,26 @@ func (m *Manager) GenerateEnvVars(ctx *ContextConfig) map[string]string {
 			envVars["GIT_AUTHOR_EMAIL"] = ctx.Git.UserEmail
 			envVars["GIT_COMMITTER_EMAIL"] = ctx.Git.UserEmail
 		}
+		if ctx.Git.SSHKey != "" {
+			keyPath := expandPath(ctx.Git.SSHKey)
+			envVars["GIT_SSH_COMMAND"] = fmt.Sprintf("ssh -i %s -o IdentitiesOnly=yes", keyPath)
+		}
+		// Use GIT_CONFIG_COUNT/KEY/VALUE to set config values via env vars
+		// without polluting ~/.gitconfig (requires Git 2.31+)
+		configIdx := 0
+		if ctx.Git.SigningKey != "" {
+			envVars[fmt.Sprintf("GIT_CONFIG_KEY_%d", configIdx)] = "user.signingkey"
+			envVars[fmt.Sprintf("GIT_CONFIG_VALUE_%d", configIdx)] = ctx.Git.SigningKey
+			configIdx++
+		}
+		if ctx.Git.GPGSign {
+			envVars[fmt.Sprintf("GIT_CONFIG_KEY_%d", configIdx)] = "commit.gpgsign"
+			envVars[fmt.Sprintf("GIT_CONFIG_VALUE_%d", configIdx)] = "true"
+			configIdx++
+		}
+		if configIdx > 0 {
+			envVars["GIT_CONFIG_COUNT"] = fmt.Sprintf("%d", configIdx)
+		}
 	}
 
 	// Proxy

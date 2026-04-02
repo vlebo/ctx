@@ -214,6 +214,7 @@ git:
   user_email: string        # Git author/committer email
   signing_key: string       # GPG key ID for signing
   gpg_sign: bool            # Enable commit signing
+  ssh_key: string           # Path to SSH private key for Git operations (sets GIT_SSH_COMMAND)
 ```
 
 ## Docker
