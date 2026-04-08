@@ -89,6 +89,21 @@ func (m *Manager) StateDir() string {
 	return m.stateDir
 }
 
+// KubeconfigPath returns the per-context kubeconfig file path used for
+// auto-isolated cloud kubernetes configurations.
+func (m *Manager) KubeconfigPath(contextName string) string {
+	return filepath.Join(m.stateDir, "kubeconfig-"+contextName)
+}
+
+// hasCloudKubernetesConfig reports whether a kubernetes config has any cloud
+// provider block (AKS/EKS/GKE) that generates its own kubeconfig contents.
+func hasCloudKubernetesConfig(k *KubernetesConfig) bool {
+	if k == nil {
+		return false
+	}
+	return k.AKS != nil || k.EKS != nil || k.GKE != nil
+}
+
 // EnsureDirs creates the configuration directories if they don't exist.
 func (m *Manager) EnsureDirs() error {
 	dirs := []string{m.configDir, m.contextsDir, m.stateDir}
@@ -440,6 +455,11 @@ func (m *Manager) GenerateEnvVars(ctx *ContextConfig) map[string]string {
 	if ctx.Kubernetes != nil {
 		if ctx.Kubernetes.Kubeconfig != "" {
 			envVars["KUBECONFIG"] = expandPath(ctx.Kubernetes.Kubeconfig)
+		} else if hasCloudKubernetesConfig(ctx.Kubernetes) {
+			// Auto-isolate kubeconfig per-context when a cloud provider
+			// (AKS/EKS/GKE) is configured, so kubectl context state doesn't
+			// leak into ~/.kube/config across shells.
+			envVars["KUBECONFIG"] = m.KubeconfigPath(ctx.Name)
 		}
 	}
 

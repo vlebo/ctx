@@ -796,10 +796,14 @@ func switchKubernetes(cfg *config.KubernetesConfig, ctx *config.ContextConfig, m
 	yellow := color.New(color.FgYellow)
 	green := color.New(color.FgGreen)
 
-	// Expand kubeconfig path if specified
+	// Expand kubeconfig path if specified, otherwise auto-isolate per-context
+	// when a cloud provider (AKS/EKS/GKE) is configured. This prevents kubectl
+	// context state from leaking into ~/.kube/config across shells.
 	kubeconfigPath := cfg.Kubeconfig
 	if kubeconfigPath != "" {
 		kubeconfigPath = expandPath(kubeconfigPath)
+	} else if cfg.AKS != nil || cfg.EKS != nil || cfg.GKE != nil {
+		kubeconfigPath = mgr.KubeconfigPath(ctx.Name)
 	}
 
 	// Fetch credentials from cloud provider if configured
