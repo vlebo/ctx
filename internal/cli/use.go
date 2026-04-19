@@ -242,9 +242,11 @@ func switchContext(mgr *config.Manager, ctx *config.ContextConfig) ([]string, er
 		}
 	}
 
-	// Start auto-connect tunnels
+	// Start auto-connect tunnels (SSH or SSM)
 	var failedTunnels []string
-	if len(ctx.Tunnels) > 0 && ctx.SSH != nil && ctx.SSH.Bastion.Host != "" {
+	hasSSHAutoConnect := ctx.SSH != nil && ctx.SSH.Bastion.Host != "" && len(ctx.Tunnels) > 0
+	hasSSMAutoConnect := ctx.AWS != nil && len(ctx.AWS.Tunnels) > 0
+	if hasSSHAutoConnect || hasSSMAutoConnect {
 		var err error
 		_, failedTunnels, err = startAutoConnectTunnels(mgr, ctx)
 		if err != nil {

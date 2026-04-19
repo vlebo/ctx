@@ -166,7 +166,8 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 	}
 
 	// Stop tunnels if any are configured and enabled
-	if len(ctx.Tunnels) > 0 {
+	hasSSMTunnels := ctx.AWS != nil && len(ctx.AWS.Tunnels) > 0
+	if len(ctx.Tunnels) > 0 || hasSSMTunnels {
 		if deactivateCfg.StopTunnels {
 			yellow.Fprint(os.Stderr, "• ")
 			fmt.Fprint(os.Stderr, "Stopping tunnels... ")
@@ -253,6 +254,14 @@ func stopContextTunnels(stateDir, contextName string) (int, error) {
 			stoppedCount++
 		}
 		delete(state.TunnelPIDs, name)
+	}
+
+	for name, entry := range state.SSMTunnelPIDs {
+		if isProcessRunning(entry.PID) {
+			killSSMProcessGroup(entry.PID)
+			stoppedCount++
+		}
+		delete(state.SSMTunnelPIDs, name)
 	}
 
 	// Remove state file
