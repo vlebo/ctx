@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.14] - 2026-04-19
+
+### Features
+
+- **AWS SSM Tunnels**: Port-forward to VPC resources via AWS Session Manager — no SSH port, no bastion key, just IAM credentials. Tunnels are configured under `aws.tunnels`, run as subprocesses (`aws ssm start-session`), and support `auto_connect`. ctx verifies that both `aws` CLI v2 and `session-manager-plugin` are installed before attempting any connection, and validates the target instance is registered in SSM before opening the tunnel interactively.
+
 ## [0.1.8] - 2026-02-17
 
 ### Bug Fixes

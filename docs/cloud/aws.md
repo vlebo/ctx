@@ -157,6 +157,25 @@ secrets:
 
 Parameters are automatically decrypted if they're SecureString type.
 
+## SSM Tunnels
+
+ctx can open port-forwarding tunnels to VPC resources via AWS Session Manager — no SSH port, no bastion key. Tunnels are configured under `aws.tunnels` and use the same AWS credentials as the rest of the context.
+
+```yaml
+aws:
+  profile: myproject-prod
+  region: eu-west-1
+  tunnels:
+    - name: postgres
+      ssm_target: i-0abc123def456789a
+      remote_host: db.internal.vpc
+      remote_port: 5432
+      local_port: 5432
+      auto_connect: true
+```
+
+See [Tunnels](../features/tunnels.md#aws-ssm-tunnels) for full configuration reference and requirements.
+
 ## Credential Isolation
 
 When using aws-vault, ctx stores temporary credentials per-context:

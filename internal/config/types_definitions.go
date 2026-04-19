@@ -37,11 +37,12 @@ const (
 
 // AWSConfig holds AWS-specific configuration.
 type AWSConfig struct {
-	Config   string `yaml:"config,omitempty" mapstructure:"config"`
-	Profile  string `yaml:"profile" mapstructure:"profile"`
-	Region   string `yaml:"region" mapstructure:"region"`
-	UseVault bool   `yaml:"use_vault" mapstructure:"use_vault"`
-	SSOLogin bool   `yaml:"sso_login,omitempty" mapstructure:"sso_login"`
+	Config   string            `yaml:"config,omitempty" mapstructure:"config"`
+	Profile  string            `yaml:"profile" mapstructure:"profile"`
+	Region   string            `yaml:"region" mapstructure:"region"`
+	UseVault bool              `yaml:"use_vault" mapstructure:"use_vault"`
+	SSOLogin bool              `yaml:"sso_login,omitempty" mapstructure:"sso_login"`
+	Tunnels  []SSMTunnelConfig `yaml:"tunnels,omitempty" mapstructure:"tunnels"`
 }
 
 // GCPConfig holds GCP-specific configuration.
@@ -128,6 +129,17 @@ type SSHConfig struct {
 type TunnelConfig struct {
 	Name        string `yaml:"name" mapstructure:"name"`
 	Description string `yaml:"description" mapstructure:"description"`
+	RemoteHost  string `yaml:"remote_host" mapstructure:"remote_host"`
+	RemotePort  int    `yaml:"remote_port" mapstructure:"remote_port"`
+	LocalPort   int    `yaml:"local_port" mapstructure:"local_port"`
+	AutoConnect bool   `yaml:"auto_connect,omitempty" mapstructure:"auto_connect"`
+}
+
+// SSMTunnelConfig holds configuration for an AWS SSM port-forwarding tunnel.
+type SSMTunnelConfig struct {
+	Name        string `yaml:"name" mapstructure:"name"`
+	Description string `yaml:"description,omitempty" mapstructure:"description"`
+	SSMTarget   string `yaml:"ssm_target" mapstructure:"ssm_target"`
 	RemoteHost  string `yaml:"remote_host" mapstructure:"remote_host"`
 	RemotePort  int    `yaml:"remote_port" mapstructure:"remote_port"`
 	LocalPort   int    `yaml:"local_port" mapstructure:"local_port"`

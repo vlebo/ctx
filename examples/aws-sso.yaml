@@ -10,6 +10,19 @@ aws:
   profile: acme-prod
   region: us-east-1
   sso_login: true                 # Auto-run 'aws sso login'
+  tunnels:
+    - name: postgres
+      ssm_target: i-0abc123def456789a   # EC2 instance ID acting as SSM bastion
+      remote_host: db.internal.vpc
+      remote_port: 5432
+      local_port: 5432
+      auto_connect: true                # Start tunnel automatically on 'ctx use'
+
+    - name: redis
+      ssm_target: i-0abc123def456789a
+      remote_host: cache.internal.vpc
+      remote_port: 6379
+      local_port: 6379
 
 kubernetes:
   context: arn:aws:eks:us-east-1:123456789:cluster/production

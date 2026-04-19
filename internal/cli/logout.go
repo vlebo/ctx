@@ -76,7 +76,8 @@ func runLogout(cmd *cobra.Command, args []string) error {
 	}
 
 	// 2. Stop tunnels (always, ignore deactivate config for logout)
-	if len(ctx.Tunnels) > 0 {
+	hasSSMTunnels := ctx.AWS != nil && len(ctx.AWS.Tunnels) > 0
+	if len(ctx.Tunnels) > 0 || hasSSMTunnels {
 		yellow.Fprint(os.Stderr, "• ")
 		fmt.Fprint(os.Stderr, "Stopping tunnels... ")
 		stopped, err := stopContextTunnels(mgr.StateDir(), contextName)
