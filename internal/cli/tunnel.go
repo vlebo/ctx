@@ -26,8 +26,8 @@ var tunnelBackground bool
 func newTunnelCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "tunnel",
-		Short: "Manage SSH tunnels",
-		Long:  "Manage SSH tunnels for the current context.",
+		Short: "Manage tunnels",
+		Long:  "Manage SSH and AWS tunnels for the current context.",
 	}
 
 	cmd.AddCommand(newTunnelListCmd())
@@ -105,7 +105,7 @@ func runTunnelList(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Tunnels for context '%s':\n\n", ctx.Name)
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"NAME", "LOCAL", "REMOTE", "DESCRIPTION"})
+	table.SetHeader([]string{"NAME", "TYPE", "LOCAL", "REMOTE", "DESCRIPTION"})
 	table.SetBorder(false)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
@@ -117,9 +117,13 @@ func runTunnelList(cmd *cobra.Command, args []string) error {
 	table.SetNoWhiteSpace(true)
 
 	for _, t := range ctx.Tunnels {
+		tunnelType := t.Type
+		if tunnelType == "" {
+			tunnelType = "ssh"
+		}
 		local := fmt.Sprintf("localhost:%d", t.LocalPort)
 		remote := fmt.Sprintf("%s:%d", t.RemoteHost, t.RemotePort)
-		table.Append([]string{t.Name, local, remote, t.Description})
+		table.Append([]string{t.Name, tunnelType, local, remote, t.Description})
 	}
 
 	table.Render()
@@ -143,18 +147,10 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to load context '%s': %w", currentContext, err)
 	}
 
-	if ctx.SSH == nil || ctx.SSH.Bastion.Host == "" {
-		return fmt.Errorf("no SSH bastion configured for this context")
-	}
-
-	if len(ctx.Tunnels) == 0 {
-		return fmt.Errorf("no tunnels defined for this context")
-	}
-
-	// Determine which tunnels to start
+	// Build candidate list
 	var tunnelsToStart []config.TunnelConfig
+
 	if len(args) > 0 {
-		// Start specific tunnel
 		tunnelName := args[0]
 		for _, t := range ctx.Tunnels {
 			if t.Name == tunnelName {
@@ -166,8 +162,11 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("tunnel '%s' not found in context", tunnelName)
 		}
 	} else {
-		// Start all tunnels
 		tunnelsToStart = ctx.Tunnels
+	}
+
+	if len(tunnelsToStart) == 0 {
+		return fmt.Errorf("no tunnels defined for this context")
 	}
 
 	// Get state directory
@@ -192,7 +191,6 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 	// Migrate old state format if needed
 	if state.PID > 0 && len(state.TunnelPIDs) == 0 {
 		if isProcessRunning(state.PID) {
-			// Old format with single PID - kill it first
 			if proc, err := os.FindProcess(state.PID); err == nil {
 				proc.Signal(syscall.SIGTERM)
 				time.Sleep(200 * time.Millisecond)
@@ -204,97 +202,197 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 
 	fmt.Printf("Starting tunnels for %s...\n", ctx.Name)
 
-	// Get tunnel timeout (default 5 seconds)
 	tunnelTimeout := 5
-	if ctx.SSH.TunnelTimeout > 0 {
+	if ctx.SSH != nil && ctx.SSH.TunnelTimeout > 0 {
 		tunnelTimeout = ctx.SSH.TunnelTimeout
 	}
 
-	// Start each tunnel as a separate SSH process
 	green := color.New(color.FgGreen)
 	yellow := color.New(color.FgYellow)
 	startedCount := 0
 	var startedTunnels []string
 
+	// Pre-flight checks — run once before the loop, not per-tunnel
+	sshOK := ctx.SSH != nil && ctx.SSH.Bastion.Host != ""
+	ssmOK := false
+	var awsEnv []string
+
+	hasSSH, hasAWS := false, false
 	for _, t := range tunnelsToStart {
-		// Check if this tunnel is already running
-		if entry, exists := state.TunnelPIDs[t.Name]; exists {
-			if isProcessRunning(entry.PID) {
-				yellow.Printf("• %s already running (PID: %d)\n", t.Name, entry.PID)
+		if t.Type == "aws" {
+			hasAWS = true
+		} else {
+			hasSSH = true
+		}
+	}
+
+	if hasSSH && !sshOK {
+		yellow.Printf("⚠ SSH tunnels skipped: no SSH bastion configured\n")
+	}
+	if hasAWS {
+		if ctx.AWS == nil {
+			yellow.Printf("⚠ AWS tunnels skipped: no aws config found\n")
+		} else if err := checkSSMDependencies(); err != nil {
+			yellow.Printf("⚠ AWS tunnels skipped: %v\n", err)
+		} else {
+			var awsCreds *config.AWSCredentials
+			if ctx.AWS.UseVault {
+				awsCreds = mgr.LoadAWSCredentials(ctx.Name)
+			}
+			awsEnv = buildAWSEnv(ctx.AWS, awsCreds)
+			ssmOK = true
+		}
+	}
+
+	for _, t := range tunnelsToStart {
+		if t.Type == "aws" {
+			if !ssmOK {
 				continue
 			}
-			// Clean up stale entry
-			delete(state.TunnelPIDs, t.Name)
-		}
 
-		// Find available port (in case configured port is in use)
-		actualPort, portChanged := findAvailablePort(t.LocalPort)
-		tunnelConfig := t
-		tunnelConfig.LocalPort = actualPort
-
-		// Build SSH args for this single tunnel
-		sshArgs := buildSSHArgs(ctx.SSH, []config.TunnelConfig{tunnelConfig})
-
-		// Start SSH process in background
-		sshCmd := exec.Command("ssh", sshArgs...)
-		sshCmd.SysProcAttr = &syscall.SysProcAttr{
-			Setsid: true,
-		}
-
-		// Redirect output to log file
-		logFile := filepath.Join(stateDir, fmt.Sprintf("%s-%s.log", ctx.Name, t.Name))
-		logFd, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
-		if err != nil {
-			yellow.Printf("⚠ %s: failed to create log file: %v\n", t.Name, err)
-			continue
-		}
-		sshCmd.Stdout = logFd
-		sshCmd.Stderr = logFd
-
-		if err := sshCmd.Start(); err != nil {
-			logFd.Close()
-			yellow.Printf("⚠ %s: failed to start: %v\n", t.Name, err)
-			continue
-		}
-
-		// Wait to see if SSH exits early (auth failure) or stays running (connected)
-		exitCh := make(chan error, 1)
-		go func() {
-			exitCh <- sshCmd.Wait()
-		}()
-
-		// Wait for tunnel to connect or fail
-		select {
-		case <-exitCh:
-			// Process exited - connection failed
-			logFd.Close()
-			logContent, _ := os.ReadFile(logFile)
-			// Extract first line of error for cleaner output
-			errMsg := strings.TrimSpace(string(logContent))
-			if idx := strings.Index(errMsg, "\n"); idx > 0 {
-				errMsg = errMsg[:idx]
+			if entry, exists := state.TunnelPIDs[t.Name]; exists {
+				if isProcessRunning(entry.PID) {
+					configChanged := entry.Config.Target != t.Target ||
+						entry.Config.RemoteHost != t.RemoteHost ||
+						entry.Config.RemotePort != t.RemotePort ||
+						entry.Config.LocalPort != t.LocalPort
+					if !configChanged {
+						yellow.Printf("• %s already running (PID: %d)\n", t.Name, entry.PID)
+						continue
+					}
+					// Config changed — stop the stale tunnel before restarting
+					killSSMProcessGroup(entry.PID)
+				}
+				delete(state.TunnelPIDs, t.Name)
 			}
-			yellow.Printf("⚠ Tunnel %s: %s\n", t.Name, errMsg)
-			continue
-		case <-time.After(time.Duration(tunnelTimeout) * time.Second):
-			// Process still running - connected successfully
-		}
 
-		// Save to state
-		state.TunnelPIDs[t.Name] = tunnelEntry{
-			PID:       sshCmd.Process.Pid,
-			StartedAt: time.Now(),
-			Config:    tunnelConfig,
-		}
-		startedCount++
-		startedTunnels = append(startedTunnels, t.Name)
+			actualPort, portChanged := findAvailablePort(t.LocalPort)
+			tunnelConfig := t
+			tunnelConfig.LocalPort = actualPort
 
-		green.Print("✓ ")
-		if portChanged {
-			fmt.Printf("%-12s localhost:%d → %s:%d (PID: %d) ", t.Name, actualPort, t.RemoteHost, t.RemotePort, sshCmd.Process.Pid)
-			yellow.Printf("(port %d was in use)\n", t.LocalPort)
+			if err := validateSSMTarget(tunnelConfig.Target, awsEnv); err != nil {
+				yellow.Printf("⚠ %s: %v\n", t.Name, err)
+				continue
+			}
+
+			ssmArgs := buildSSMArgs(tunnelConfig)
+			cmd := exec.Command("aws", ssmArgs...)
+			cmd.Env = awsEnv
+			cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+
+			logFile := filepath.Join(stateDir, fmt.Sprintf("%s-%s.log", ctx.Name, t.Name))
+			logFd, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+			if err != nil {
+				yellow.Printf("⚠ %s: failed to create log file: %v\n", t.Name, err)
+				continue
+			}
+			cmd.Stdout = logFd
+			cmd.Stderr = logFd
+
+			if err := cmd.Start(); err != nil {
+				logFd.Close()
+				yellow.Printf("⚠ %s: failed to start: %v\n", t.Name, err)
+				continue
+			}
+
+			exitCh := make(chan error, 1)
+			go func(c *exec.Cmd) { exitCh <- c.Wait() }(cmd)
+
+			select {
+			case <-exitCh:
+				logFd.Close()
+				logContent, _ := os.ReadFile(logFile)
+				errMsg := strings.TrimSpace(string(logContent))
+				if idx := strings.Index(errMsg, "\n"); idx > 0 {
+					errMsg = errMsg[:idx]
+				}
+				yellow.Printf("⚠ Tunnel %s: %s\n", t.Name, errMsg)
+				continue
+			case <-time.After(time.Duration(tunnelTimeout) * time.Second):
+			}
+
+			state.TunnelPIDs[t.Name] = tunnelEntry{
+				PID:       cmd.Process.Pid,
+				StartedAt: time.Now(),
+				Config:    tunnelConfig,
+			}
+			startedCount++
+			startedTunnels = append(startedTunnels, t.Name)
+
+			green.Print("✓ ")
+			if portChanged {
+				fmt.Printf("%-12s localhost:%d → %s:%d (PID: %d) ", t.Name, actualPort, t.RemoteHost, t.RemotePort, cmd.Process.Pid)
+				yellow.Printf("(port %d was in use)\n", t.LocalPort)
+			} else {
+				fmt.Printf("%-12s localhost:%d → %s:%d (PID: %d)\n", t.Name, t.LocalPort, t.RemoteHost, t.RemotePort, cmd.Process.Pid)
+			}
 		} else {
-			fmt.Printf("%-12s localhost:%d → %s:%d (PID: %d)\n", t.Name, t.LocalPort, t.RemoteHost, t.RemotePort, sshCmd.Process.Pid)
+			if !sshOK {
+				continue
+			}
+
+			if entry, exists := state.TunnelPIDs[t.Name]; exists {
+				if isProcessRunning(entry.PID) {
+					yellow.Printf("• %s already running (PID: %d)\n", t.Name, entry.PID)
+					continue
+				}
+				delete(state.TunnelPIDs, t.Name)
+			}
+
+			actualPort, portChanged := findAvailablePort(t.LocalPort)
+			tunnelConfig := t
+			tunnelConfig.LocalPort = actualPort
+
+			sshArgs := buildSSHArgs(ctx.SSH, []config.TunnelConfig{tunnelConfig})
+			cmd := exec.Command("ssh", sshArgs...)
+			cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+
+			logFile := filepath.Join(stateDir, fmt.Sprintf("%s-%s.log", ctx.Name, t.Name))
+			logFd, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+			if err != nil {
+				yellow.Printf("⚠ %s: failed to create log file: %v\n", t.Name, err)
+				continue
+			}
+			cmd.Stdout = logFd
+			cmd.Stderr = logFd
+
+			if err := cmd.Start(); err != nil {
+				logFd.Close()
+				yellow.Printf("⚠ %s: failed to start: %v\n", t.Name, err)
+				continue
+			}
+
+			exitCh := make(chan error, 1)
+			go func(c *exec.Cmd) { exitCh <- c.Wait() }(cmd)
+
+			select {
+			case <-exitCh:
+				logFd.Close()
+				logContent, _ := os.ReadFile(logFile)
+				errMsg := strings.TrimSpace(string(logContent))
+				if idx := strings.Index(errMsg, "\n"); idx > 0 {
+					errMsg = errMsg[:idx]
+				}
+				yellow.Printf("⚠ Tunnel %s: %s\n", t.Name, errMsg)
+				continue
+			case <-time.After(time.Duration(tunnelTimeout) * time.Second):
+			}
+
+			state.TunnelPIDs[t.Name] = tunnelEntry{
+				PID:       cmd.Process.Pid,
+				StartedAt: time.Now(),
+				Config:    tunnelConfig,
+			}
+			startedCount++
+			startedTunnels = append(startedTunnels, t.Name)
+
+			green.Print("✓ ")
+			if portChanged {
+				fmt.Printf("%-12s localhost:%d → %s:%d (PID: %d) ", t.Name, actualPort, t.RemoteHost, t.RemotePort, cmd.Process.Pid)
+				yellow.Printf("(port %d was in use)\n", t.LocalPort)
+			} else {
+				fmt.Printf("%-12s localhost:%d → %s:%d (PID: %d)\n", t.Name, t.LocalPort, t.RemoteHost, t.RemotePort, cmd.Process.Pid)
+			}
 		}
 	}
 
@@ -305,7 +403,6 @@ func runTunnelUp(cmd *cobra.Command, args []string) error {
 
 	if startedCount > 0 {
 		fmt.Printf("\n%d tunnel(s) started.\n", startedCount)
-		// Send tunnel.up audit event
 		sendTunnelEvent(mgr, ctx.Name, string(ctx.Environment), "tunnel.up", startedTunnels, true)
 	}
 	fmt.Println("Use 'ctx tunnel status' to check status.")
@@ -360,17 +457,87 @@ func buildSSHArgs(sshConfig *config.SSHConfig, tunnels []config.TunnelConfig) []
 	return args
 }
 
+// checkSSMDependencies verifies that aws CLI and session-manager-plugin are available.
+func checkSSMDependencies() error {
+	if _, err := exec.LookPath("aws"); err != nil {
+		return fmt.Errorf("AWS CLI not found: install aws-cli v2 from https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html")
+	}
+	if _, err := exec.LookPath("session-manager-plugin"); err != nil {
+		return fmt.Errorf("session-manager-plugin not found: install from https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html")
+	}
+	return nil
+}
+
+// buildAWSEnv builds a cmd.Env slice with AWS credentials injected explicitly.
+// This is required for auto_connect tunnels started before the shell hook sources the env file.
+func buildAWSEnv(awsCfg *config.AWSConfig, awsCreds *config.AWSCredentials) []string {
+	env := os.Environ()
+	if awsCfg.Config != "" {
+		env = append(env, "AWS_CONFIG_FILE="+expandPath(awsCfg.Config))
+	}
+	if awsCreds != nil {
+		env = append(env, "AWS_ACCESS_KEY_ID="+awsCreds.AccessKeyID)
+		env = append(env, "AWS_SECRET_ACCESS_KEY="+awsCreds.SecretAccessKey)
+		if awsCreds.SessionToken != "" {
+			env = append(env, "AWS_SESSION_TOKEN="+awsCreds.SessionToken)
+		}
+	} else if awsCfg.Profile != "" {
+		env = append(env, "AWS_PROFILE="+awsCfg.Profile)
+	}
+	if awsCfg.Region != "" {
+		env = append(env, "AWS_REGION="+awsCfg.Region, "AWS_DEFAULT_REGION="+awsCfg.Region)
+	}
+	return env
+}
+
+// buildSSMArgs builds the aws ssm start-session arguments for port forwarding to a remote host.
+func buildSSMArgs(tunnel config.TunnelConfig) []string {
+	params := fmt.Sprintf(
+		`{"host":["%s"],"portNumber":["%d"],"localPortNumber":["%d"]}`,
+		tunnel.RemoteHost, tunnel.RemotePort, tunnel.LocalPort,
+	)
+	return []string{
+		"ssm", "start-session",
+		"--target", tunnel.Target,
+		"--document-name", "AWS-StartPortForwardingSessionToRemoteHost",
+		"--parameters", params,
+	}
+}
+
+// validateSSMTarget checks that the given EC2 instance ID is registered in SSM.
+func validateSSMTarget(instanceID string, awsEnv []string) error {
+	cmd := exec.Command("aws", "ssm", "describe-instance-information",
+		"--filters", fmt.Sprintf("Key=InstanceIds,Values=%s", instanceID),
+		"--output", "json",
+	)
+	cmd.Env = awsEnv
+	out, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to check SSM registration for %s: %w", instanceID, err)
+	}
+	var result struct {
+		InstanceInformationList []struct{} `json:"InstanceInformationList"`
+	}
+	if err := json.Unmarshal(out, &result); err != nil {
+		return fmt.Errorf("failed to parse SSM response: %w", err)
+	}
+	if len(result.InstanceInformationList) == 0 {
+		return fmt.Errorf("instance %q is not registered in SSM — verify the SSM Agent is running and the instance profile has AmazonSSMManagedInstanceCore", instanceID)
+	}
+	return nil
+}
+
 // tunnelState represents the persisted state of running tunnels.
-// Now stores one PID per tunnel for independent management.
+// One entry per tunnel regardless of transport type (ssh or aws).
 type tunnelState struct {
 	StartedAt   time.Time              `json:"started_at"`            // Deprecated
-	TunnelPIDs  map[string]tunnelEntry `json:"tunnel_pids,omitempty"` // New: per-tunnel PIDs
+	TunnelPIDs  map[string]tunnelEntry `json:"tunnel_pids,omitempty"` // All tunnels (ssh and aws)
 	ContextName string                 `json:"context_name"`
 	Tunnels     []config.TunnelConfig  `json:"tunnels,omitempty"` // Deprecated
 	PID         int                    `json:"pid,omitempty"`     // Deprecated: for backwards compat
 }
 
-// tunnelEntry represents a single running tunnel.
+// tunnelEntry represents a single running tunnel (ssh or aws).
 type tunnelEntry struct {
 	StartedAt time.Time           `json:"started_at"`
 	Config    config.TunnelConfig `json:"config"`
@@ -407,6 +574,14 @@ func isProcessRunning(pid int) bool {
 	}
 	err = process.Signal(syscall.Signal(0))
 	return err == nil
+}
+
+// killSSMProcessGroup sends SIGTERM to the entire process group of an SSM tunnel.
+// aws ssm start-session spawns session-manager-plugin as a child — killing only
+// the aws PID leaves the plugin alive. Since we start with Setsid=true the
+// process group ID equals the aws PID, so Kill(-pid) reaches both.
+func killSSMProcessGroup(pid int) {
+	_ = syscall.Kill(-pid, syscall.SIGTERM)
 }
 
 // isPortAvailable checks if a local port is available for binding.
@@ -484,32 +659,38 @@ func runTunnelDown(cmd *cobra.Command, args []string) error {
 	}
 
 	// Determine which tunnels to stop
-	var tunnelsToStop []string
+	var toStop []string
+
 	if len(args) > 0 {
-		// Stop specific tunnel
 		tunnelName := args[0]
 		if _, exists := state.TunnelPIDs[tunnelName]; exists {
-			tunnelsToStop = append(tunnelsToStop, tunnelName)
+			toStop = append(toStop, tunnelName)
 		} else {
 			return fmt.Errorf("tunnel '%s' is not running", tunnelName)
 		}
 	} else {
-		// Stop all tunnels
 		for name := range state.TunnelPIDs {
-			tunnelsToStop = append(tunnelsToStop, name)
+			toStop = append(toStop, name)
 		}
 	}
 
 	stoppedCount := 0
-	for _, name := range tunnelsToStop {
+	var stoppedNames []string
+
+	for _, name := range toStop {
 		entry := state.TunnelPIDs[name]
 		if isProcessRunning(entry.PID) {
-			process, _ := os.FindProcess(entry.PID)
-			process.Signal(syscall.SIGTERM)
+			if entry.Config.Type == "aws" {
+				killSSMProcessGroup(entry.PID)
+			} else {
+				process, _ := os.FindProcess(entry.PID)
+				process.Signal(syscall.SIGTERM)
+			}
 			stoppedCount++
 			green.Printf("✓ Stopped %s (PID: %d)\n", name, entry.PID)
 		}
 		delete(state.TunnelPIDs, name)
+		stoppedNames = append(stoppedNames, name)
 	}
 
 	// Save or remove state file
@@ -523,14 +704,13 @@ func runTunnelDown(cmd *cobra.Command, args []string) error {
 		fmt.Println("No active tunnels to stop.")
 	} else {
 		fmt.Printf("\n%d tunnel(s) stopped.\n", stoppedCount)
-		// Send tunnel.down audit event
-		sendTunnelEvent(mgr, ctx.Name, string(ctx.Environment), "tunnel.down", tunnelsToStop, true)
+		sendTunnelEvent(mgr, ctx.Name, string(ctx.Environment), "tunnel.down", stoppedNames, true)
 	}
 
 	return nil
 }
 
-// pendingTunnel holds information about a tunnel being started.
+// pendingTunnel holds information about a tunnel being started (ssh or aws).
 type pendingTunnel struct {
 	config      config.TunnelConfig
 	actualPort  int
@@ -544,15 +724,13 @@ type pendingTunnel struct {
 // startAutoConnectTunnels starts tunnels that have auto_connect enabled.
 // Called during context switch. Returns (successfulTunnels, failedTunnels, error).
 func startAutoConnectTunnels(mgr *config.Manager, ctx *config.ContextConfig) ([]string, []string, error) {
-	// Filter tunnels with auto_connect
-	var autoConnectTunnels []config.TunnelConfig
+	var autoConnect []config.TunnelConfig
 	for _, t := range ctx.Tunnels {
 		if t.AutoConnect {
-			autoConnectTunnels = append(autoConnectTunnels, t)
+			autoConnect = append(autoConnect, t)
 		}
 	}
-
-	if len(autoConnectTunnels) == 0 {
+	if len(autoConnect) == 0 {
 		return nil, nil, nil
 	}
 
@@ -578,109 +756,187 @@ func startAutoConnectTunnels(mgr *config.Manager, ctx *config.ContextConfig) ([]
 	yellow := color.New(color.FgYellow)
 	green := color.New(color.FgGreen)
 
-	// Phase 1: Start all tunnels in parallel
-	var pending []pendingTunnel
-	for _, t := range autoConnectTunnels {
-		// Check if this tunnel is already running
-		if entry, exists := state.TunnelPIDs[t.Name]; exists {
-			if isProcessRunning(entry.PID) {
-				green.Fprintf(os.Stderr, "✓ Tunnel %s already running (PID: %d)\n", t.Name, entry.PID)
-				continue
-			}
-			delete(state.TunnelPIDs, t.Name)
-		}
-
-		// Find available port (in case configured port is in use)
-		actualPort, portChanged := findAvailablePort(t.LocalPort)
-		tunnelConfig := t
-		tunnelConfig.LocalPort = actualPort
-
-		// Build SSH args for this single tunnel
-		sshArgs := buildSSHArgs(ctx.SSH, []config.TunnelConfig{tunnelConfig})
-
-		// Start SSH process in background
-		sshCmd := exec.Command("ssh", sshArgs...)
-		sshCmd.SysProcAttr = &syscall.SysProcAttr{
-			Setsid: true,
-		}
-
-		// Redirect output to log file
-		logFile := filepath.Join(stateDir, fmt.Sprintf("%s-%s.log", ctx.Name, t.Name))
-		logFd, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
-		if err != nil {
-			yellow.Fprintf(os.Stderr, "⚠ Tunnel %s: failed to create log file: %v\n", t.Name, err)
-			continue
-		}
-		sshCmd.Stdout = logFd
-		sshCmd.Stderr = logFd
-
-		if err := sshCmd.Start(); err != nil {
-			logFd.Close()
-			yellow.Fprintf(os.Stderr, "⚠ Tunnel %s: failed to start: %v\n", t.Name, err)
-			continue
-		}
-
-		// Start goroutine to wait for process exit
-		exitCh := make(chan error, 1)
-		go func(cmd *exec.Cmd) {
-			exitCh <- cmd.Wait()
-		}(sshCmd)
-
-		pending = append(pending, pendingTunnel{
-			config:      tunnelConfig,
-			actualPort:  actualPort,
-			portChanged: portChanged,
-			cmd:         sshCmd,
-			logFile:     logFile,
-			logFd:       logFd,
-			exitCh:      exitCh,
-		})
-	}
-
-	if len(pending) == 0 {
-		return nil, nil, nil
-	}
-
-	// Phase 2: Wait for tunnels to either connect or fail
-	// SSH auth failures typically complete within 2-3 seconds
-	timeout := 5 // default 5 seconds
+	timeout := 5
 	if ctx.SSH != nil && ctx.SSH.TunnelTimeout > 0 {
 		timeout = ctx.SSH.TunnelTimeout
 	}
-	time.Sleep(time.Duration(timeout) * time.Second)
 
-	// Phase 3: Check results and report
+	// Pre-flight checks — run once before starting any tunnel
+	sshOK := ctx.SSH != nil && ctx.SSH.Bastion.Host != ""
+	ssmOK := false
+	var awsEnv []string
+
+	hasSSH, hasAWS := false, false
+	for _, t := range autoConnect {
+		if t.Type == "aws" {
+			hasAWS = true
+		} else {
+			hasSSH = true
+		}
+	}
+	if hasSSH && !sshOK {
+		yellow.Fprintf(os.Stderr, "⚠ SSH auto-connect skipped: no SSH bastion configured\n")
+	}
+	if hasAWS {
+		if ctx.AWS == nil {
+			yellow.Fprintf(os.Stderr, "⚠ AWS auto-connect skipped: no aws config found\n")
+		} else if err := checkSSMDependencies(); err != nil {
+			yellow.Fprintf(os.Stderr, "⚠ AWS auto-connect skipped: %v\n", err)
+		} else {
+			var awsCreds *config.AWSCredentials
+			if ctx.AWS.UseVault {
+				awsCreds = mgr.LoadAWSCredentials(ctx.Name)
+			}
+			awsEnv = buildAWSEnv(ctx.AWS, awsCreds)
+			ssmOK = true
+		}
+	}
+
 	var startedTunnels []string
 	var failedTunnels []string
-	for _, p := range pending {
-		t := p.config
 
-		// Check if process exited (failed) or still running (connected)
-		select {
-		case <-p.exitCh:
-			// Process exited - connection failed
-			p.logFd.Close()
-			logContent, _ := os.ReadFile(p.logFile)
-			errMsg := strings.TrimSpace(string(logContent))
-			if idx := strings.Index(errMsg, "\n"); idx > 0 {
-				errMsg = errMsg[:idx]
+	// Phase 1: Start all tunnels in parallel
+	var pending []pendingTunnel
+	for _, t := range autoConnect {
+		if t.Type == "aws" {
+			if !ssmOK {
+				continue
 			}
-			yellow.Fprintf(os.Stderr, "⚠ Tunnel %s: %s\n", t.Name, errMsg)
-			failedTunnels = append(failedTunnels, t.Name)
-		default:
-			// Process still running - connected successfully
-			state.TunnelPIDs[t.Name] = tunnelEntry{
-				PID:       p.cmd.Process.Pid,
-				StartedAt: time.Now(),
-				Config:    t,
-			}
-			startedTunnels = append(startedTunnels, t.Name)
 
-			if p.portChanged {
-				green.Fprintf(os.Stderr, "✓ Tunnel %s: localhost:%d → %s:%d ", t.Name, p.actualPort, t.RemoteHost, t.RemotePort)
-				yellow.Fprintf(os.Stderr, "(port %d in use)\n", t.LocalPort)
-			} else {
-				green.Fprintf(os.Stderr, "✓ Tunnel %s: localhost:%d → %s:%d\n", t.Name, t.LocalPort, t.RemoteHost, t.RemotePort)
+			if entry, exists := state.TunnelPIDs[t.Name]; exists {
+				if isProcessRunning(entry.PID) {
+					configChanged := entry.Config.Target != t.Target ||
+						entry.Config.RemoteHost != t.RemoteHost ||
+						entry.Config.RemotePort != t.RemotePort ||
+						entry.Config.LocalPort != t.LocalPort
+					if !configChanged {
+						green.Fprintf(os.Stderr, "✓ Tunnel %s already running (PID: %d)\n", t.Name, entry.PID)
+						continue
+					}
+					killSSMProcessGroup(entry.PID)
+				}
+				delete(state.TunnelPIDs, t.Name)
+			}
+
+			actualPort, portChanged := findAvailablePort(t.LocalPort)
+			tunnelConfig := t
+			tunnelConfig.LocalPort = actualPort
+
+			ssmArgs := buildSSMArgs(tunnelConfig)
+			cmd := exec.Command("aws", ssmArgs...)
+			cmd.Env = awsEnv
+			cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+
+			logFile := filepath.Join(stateDir, fmt.Sprintf("%s-%s.log", ctx.Name, t.Name))
+			logFd, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+			if err != nil {
+				yellow.Fprintf(os.Stderr, "⚠ Tunnel %s: failed to create log file: %v\n", t.Name, err)
+				continue
+			}
+			cmd.Stdout = logFd
+			cmd.Stderr = logFd
+
+			if err := cmd.Start(); err != nil {
+				logFd.Close()
+				yellow.Fprintf(os.Stderr, "⚠ Tunnel %s: failed to start: %v\n", t.Name, err)
+				failedTunnels = append(failedTunnels, t.Name)
+				continue
+			}
+
+			exitCh := make(chan error, 1)
+			go func(c *exec.Cmd) { exitCh <- c.Wait() }(cmd)
+
+			pending = append(pending, pendingTunnel{
+				config:      tunnelConfig,
+				actualPort:  actualPort,
+				portChanged: portChanged,
+				cmd:         cmd,
+				logFile:     logFile,
+				logFd:       logFd,
+				exitCh:      exitCh,
+			})
+		} else {
+			if !sshOK {
+				continue
+			}
+
+			if entry, exists := state.TunnelPIDs[t.Name]; exists {
+				if isProcessRunning(entry.PID) {
+					green.Fprintf(os.Stderr, "✓ Tunnel %s already running (PID: %d)\n", t.Name, entry.PID)
+					continue
+				}
+				delete(state.TunnelPIDs, t.Name)
+			}
+
+			actualPort, portChanged := findAvailablePort(t.LocalPort)
+			tunnelConfig := t
+			tunnelConfig.LocalPort = actualPort
+
+			sshArgs := buildSSHArgs(ctx.SSH, []config.TunnelConfig{tunnelConfig})
+			cmd := exec.Command("ssh", sshArgs...)
+			cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+
+			logFile := filepath.Join(stateDir, fmt.Sprintf("%s-%s.log", ctx.Name, t.Name))
+			logFd, err := os.OpenFile(logFile, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o644)
+			if err != nil {
+				yellow.Fprintf(os.Stderr, "⚠ Tunnel %s: failed to create log file: %v\n", t.Name, err)
+				continue
+			}
+			cmd.Stdout = logFd
+			cmd.Stderr = logFd
+
+			if err := cmd.Start(); err != nil {
+				logFd.Close()
+				yellow.Fprintf(os.Stderr, "⚠ Tunnel %s: failed to start: %v\n", t.Name, err)
+				continue
+			}
+
+			exitCh := make(chan error, 1)
+			go func(c *exec.Cmd) { exitCh <- c.Wait() }(cmd)
+
+			pending = append(pending, pendingTunnel{
+				config:      tunnelConfig,
+				actualPort:  actualPort,
+				portChanged: portChanged,
+				cmd:         cmd,
+				logFile:     logFile,
+				logFd:       logFd,
+				exitCh:      exitCh,
+			})
+		}
+	}
+
+	if len(pending) > 0 {
+		// Phase 2: Wait once for all tunnels (ssh and aws together)
+		time.Sleep(time.Duration(timeout) * time.Second)
+
+		// Phase 3: Check results
+		for _, p := range pending {
+			t := p.config
+			select {
+			case <-p.exitCh:
+				p.logFd.Close()
+				logContent, _ := os.ReadFile(p.logFile)
+				errMsg := strings.TrimSpace(string(logContent))
+				if idx := strings.Index(errMsg, "\n"); idx > 0 {
+					errMsg = errMsg[:idx]
+				}
+				yellow.Fprintf(os.Stderr, "⚠ Tunnel %s: %s\n", t.Name, errMsg)
+				failedTunnels = append(failedTunnels, t.Name)
+			default:
+				state.TunnelPIDs[t.Name] = tunnelEntry{
+					PID:       p.cmd.Process.Pid,
+					StartedAt: time.Now(),
+					Config:    t,
+				}
+				startedTunnels = append(startedTunnels, t.Name)
+
+				if p.portChanged {
+					green.Fprintf(os.Stderr, "✓ Tunnel %s: localhost:%d → %s:%d ", t.Name, p.actualPort, t.RemoteHost, t.RemotePort)
+					yellow.Fprintf(os.Stderr, "(port %d in use)\n", t.LocalPort)
+				} else {
+					green.Fprintf(os.Stderr, "✓ Tunnel %s: localhost:%d → %s:%d\n", t.Name, t.LocalPort, t.RemoteHost, t.RemotePort)
+				}
 			}
 		}
 	}
@@ -758,7 +1014,7 @@ func runTunnelStatus(cmd *cobra.Command, args []string) error {
 	fmt.Printf("Tunnels for context '%s'\n\n", ctx.Name)
 
 	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader([]string{"TUNNEL", "LOCAL", "REMOTE", "PID", "STATUS"})
+	table.SetHeader([]string{"TUNNEL", "TYPE", "LOCAL", "REMOTE", "PID", "STATUS"})
 	table.SetBorder(false)
 	table.SetHeaderAlignment(tablewriter.ALIGN_LEFT)
 	table.SetAlignment(tablewriter.ALIGN_LEFT)
@@ -769,29 +1025,31 @@ func runTunnelStatus(cmd *cobra.Command, args []string) error {
 	table.SetTablePadding("  ")
 	table.SetNoWhiteSpace(true)
 
-	activeCount := 0
-	staleNames := []string{}
+	var stale []string
+
 	for name, entry := range state.TunnelPIDs {
 		t := entry.Config
+		tunnelType := t.Type
+		if tunnelType == "" {
+			tunnelType = "ssh"
+		}
 		localAddr := fmt.Sprintf("localhost:%d", t.LocalPort)
 		remoteAddr := fmt.Sprintf("%s:%d", t.RemoteHost, t.RemotePort)
 		pidStr := fmt.Sprintf("%d", entry.PID)
 		var statusStr string
 		if isProcessRunning(entry.PID) {
 			statusStr = "● connected"
-			activeCount++
 		} else {
 			statusStr = "○ stopped"
-			staleNames = append(staleNames, name)
+			stale = append(stale, name)
 		}
-		table.Append([]string{name, localAddr, remoteAddr, pidStr, statusStr})
+		table.Append([]string{name, tunnelType, localAddr, remoteAddr, pidStr, statusStr})
 	}
 
-	// Clean up stale entries
-	for _, name := range staleNames {
+	for _, name := range stale {
 		delete(state.TunnelPIDs, name)
 	}
-	if len(staleNames) > 0 {
+	if len(stale) > 0 {
 		if len(state.TunnelPIDs) == 0 {
 			os.Remove(stateFile)
 		} else {
@@ -801,7 +1059,6 @@ func runTunnelStatus(cmd *cobra.Command, args []string) error {
 
 	table.Render()
 
-	// Show log file location
 	logFile := filepath.Join(stateDir, ctx.Name+".log")
 	fmt.Printf("\nLog file: %s\n", logFile)
 

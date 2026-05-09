@@ -244,7 +244,7 @@ func switchContext(mgr *config.Manager, ctx *config.ContextConfig) ([]string, er
 
 	// Start auto-connect tunnels
 	var failedTunnels []string
-	if len(ctx.Tunnels) > 0 && ctx.SSH != nil && ctx.SSH.Bastion.Host != "" {
+	if len(ctx.Tunnels) > 0 {
 		var err error
 		_, failedTunnels, err = startAutoConnectTunnels(mgr, ctx)
 		if err != nil {

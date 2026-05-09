@@ -248,8 +248,12 @@ func stopContextTunnels(stateDir, contextName string) (int, error) {
 	// New format: per-tunnel PIDs
 	for name, entry := range state.TunnelPIDs {
 		if isProcessRunning(entry.PID) {
-			process, _ := os.FindProcess(entry.PID)
-			process.Signal(syscall.SIGTERM)
+			if entry.Config.Type == "aws" {
+				killSSMProcessGroup(entry.PID)
+			} else {
+				process, _ := os.FindProcess(entry.PID)
+				process.Signal(syscall.SIGTERM)
+			}
 			stoppedCount++
 		}
 		delete(state.TunnelPIDs, name)

@@ -250,6 +250,42 @@ func TestValidateContext(t *testing.T) {
 			errMsg:  "SSH bastion must be configured",
 		},
 		{
+			name: "aws tunnel without bastion is valid",
+			ctx: &ContextConfig{
+				Name: "test",
+				AWS:  &AWSConfig{Profile: "my-profile", Region: "eu-west-1"},
+				Tunnels: []TunnelConfig{
+					{
+						Name:       "postgres",
+						Type:       "aws",
+						Target:     "i-0abc123def456789a",
+						RemoteHost: "db.internal.vpc",
+						RemotePort: 5432,
+						LocalPort:  5432,
+					},
+				},
+			},
+			wantErr: false,
+		},
+		{
+			name: "aws tunnel missing target",
+			ctx: &ContextConfig{
+				Name: "test",
+				AWS:  &AWSConfig{Profile: "my-profile", Region: "eu-west-1"},
+				Tunnels: []TunnelConfig{
+					{
+						Name:       "postgres",
+						Type:       "aws",
+						RemoteHost: "db.internal.vpc",
+						RemotePort: 5432,
+						LocalPort:  5432,
+					},
+				},
+			},
+			wantErr: true,
+			errMsg:  "target is required for type aws",
+		},
+		{
 			name: "valid AKS config",
 			ctx: &ContextConfig{
 				Name: "test",

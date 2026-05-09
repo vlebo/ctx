@@ -343,6 +343,7 @@ func ValidateContext(ctx *ContextConfig) error {
 	}
 
 	// Validate tunnels
+	hasSSHTunnels := false
 	for i, t := range ctx.Tunnels {
 		if t.Name == "" {
 			return fmt.Errorf("tunnel %d: name is required", i)
@@ -356,13 +357,18 @@ func ValidateContext(ctx *ContextConfig) error {
 		if t.LocalPort <= 0 || t.LocalPort > 65535 {
 			return fmt.Errorf("tunnel %s: invalid local_port %d", t.Name, t.LocalPort)
 		}
+		if t.Type == "aws" {
+			if t.Target == "" {
+				return fmt.Errorf("tunnel %s: target is required for type aws", t.Name)
+			}
+		} else {
+			hasSSHTunnels = true
+		}
 	}
 
-	// If tunnels are defined, SSH bastion should be configured
-	if len(ctx.Tunnels) > 0 {
-		if ctx.SSH == nil || ctx.SSH.Bastion.Host == "" {
-			return fmt.Errorf("SSH bastion must be configured when tunnels are defined")
-		}
+	// SSH bastion is required only for SSH tunnels (type: aws tunnels use IAM credentials)
+	if hasSSHTunnels && (ctx.SSH == nil || ctx.SSH.Bastion.Host == "") {
+		return fmt.Errorf("SSH bastion must be configured when SSH tunnels are defined")
 	}
 
 	// Validate secret files

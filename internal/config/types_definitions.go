@@ -125,9 +125,13 @@ type SSHConfig struct {
 }
 
 // TunnelConfig holds configuration for a single tunnel.
+// Type selects the transport: empty or "ssh" uses the SSH bastion; "aws" uses AWS SSM Session Manager.
+// Target is required for type "aws" and holds the EC2 instance ID (i-xxxxxxxxxxxxxxxxx).
 type TunnelConfig struct {
 	Name        string `yaml:"name" mapstructure:"name"`
 	Description string `yaml:"description" mapstructure:"description"`
+	Type        string `yaml:"type,omitempty" mapstructure:"type"`
+	Target      string `yaml:"target,omitempty" mapstructure:"target"`
 	RemoteHost  string `yaml:"remote_host" mapstructure:"remote_host"`
 	RemotePort  int    `yaml:"remote_port" mapstructure:"remote_port"`
 	LocalPort   int    `yaml:"local_port" mapstructure:"local_port"`

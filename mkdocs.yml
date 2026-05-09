@@ -57,7 +57,7 @@ nav:
       - Cloud Secrets: secrets/cloud.md
   - Features:
       - VPN: features/vpn.md
-      - SSH Tunnels: features/tunnels.md
+      - Tunnels: features/tunnels.md
       - Browser Profiles: features/browser.md
       - Editor/IDE: features/editor.md
       - Proxy: features/proxy.md
