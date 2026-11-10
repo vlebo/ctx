@@ -59,6 +59,12 @@ Switch between AWS profiles, Kubernetes clusters, VPN connections, and SSH tunne
 curl -fsSL https://github.com/vlebo/ctx/releases/latest/download/install.sh | sh
 ```
 
+Or with Homebrew (macOS and Linux):
+
+```bash
+brew install vlebo/tap/ctx
+```
+
 Then add the shell hook to your `~/.zshrc` or `~/.bashrc`:
 
 === "Zsh"
