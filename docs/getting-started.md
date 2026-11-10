@@ -10,6 +10,12 @@ This guide will help you set up `ctx` and create your first context.
 curl -fsSL https://github.com/vlebo/ctx/releases/latest/download/install.sh | sh
 ```
 
+### Homebrew
+
+```bash
+brew install vlebo/tap/ctx
+```
+
 ### From Source
 
 ```bash

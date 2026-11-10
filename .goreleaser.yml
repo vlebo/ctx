@@ -26,7 +26,7 @@ builds:
       - -X 'main.date={{.Date}}'
 
 archives:
-  - format: tar.gz
+  - formats: [tar.gz]
     name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
@@ -38,6 +38,23 @@ checksum:
 
 snapshot:
   version_template: "{{ incpatch .Version }}-next"
+
+homebrew_casks:
+  - name: ctx
+    repository:
+      owner: vlebo
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/vlebo/ctx
+    description: "Context switcher for DevOps"
+    license: MIT
+    hooks:
+      post:
+        # binaries are unsigned; drop quarantine so Gatekeeper doesn't block them
+        install_steps: |
+          on_macos do
+            run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/ctx"]
+          end
 
 changelog:
   sort: asc

@@ -49,6 +49,12 @@ $ ctx use acme-prod
 curl -fsSL https://github.com/vlebo/ctx/releases/latest/download/install.sh | sh
 ```
 
+Or with Homebrew (macOS and Linux):
+
+```bash
+brew install vlebo/tap/ctx
+```
+
 Add to your `~/.zshrc` or `~/.bashrc`:
 
 ```bash
