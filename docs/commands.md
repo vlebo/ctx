@@ -268,6 +268,6 @@ Add to your shell config:
 |------|---------|
 | `0` | Success |
 | `1` | General error |
-| `2` | Context not found |
+| `2` | Context not found (including a missing parent in `extends`) |
 | `3` | Abstract context (cannot use) |
-| `4` | Production confirmation declined |
+| `4` | Confirmation declined |

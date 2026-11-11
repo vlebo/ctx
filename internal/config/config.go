@@ -225,7 +225,7 @@ func (m *Manager) loadContextWithChain(name string, chain []string) (*ContextCon
 	data, err := os.ReadFile(contextPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("context '%s' not found", name)
+			return nil, &ContextNotFoundError{Name: name}
 		}
 		return nil, fmt.Errorf("failed to read context file: %w", err)
 	}
@@ -311,7 +311,7 @@ func (m *Manager) DeleteContext(name string) error {
 	contextPath := filepath.Join(m.contextsDir, name+".yaml")
 
 	if _, err := os.Stat(contextPath); os.IsNotExist(err) {
-		return fmt.Errorf("context '%s' not found", name)
+		return &ContextNotFoundError{Name: name}
 	}
 
 	if err := os.Remove(contextPath); err != nil {
