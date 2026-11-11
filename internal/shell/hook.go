@@ -51,9 +51,11 @@ func convertPromptFormatToBash(format string) string {
 	result = strings.ReplaceAll(result, "{{.Environment}}", "${ctx_env}")
 
 	// Handle {{if .IsProd}}...{{end}} conditionals
-	// Convert to: $([ "$ctx_env" = "production" ] && echo "..." || echo "")
+	// Shown when the context requires confirmation (CTX_CONFIRM=true).
+	// Convert to: $([ "${CTX_CONFIRM:-}" = "true" ] && echo '...')
+	// Note: $$ is a literal $ in regexp replacement strings.
 	ifProdRegex := regexp.MustCompile(`\{\{if \.IsProd\}\}(.*?)\{\{end\}\}`)
-	result = ifProdRegex.ReplaceAllString(result, `$([ "$ctx_env" = "production" -o "$ctx_env" = "prod" ] && echo '$1')`)
+	result = ifProdRegex.ReplaceAllString(result, `$$([ "$${CTX_CONFIRM:-}" = "true" ] && echo '${1}')`)
 
 	return result
 }
@@ -67,9 +69,10 @@ func convertPromptFormatToFish(format string) string {
 	result = strings.ReplaceAll(result, "{{.Environment}}", "$ctx_env")
 
 	// Handle {{if .IsProd}}...{{end}} conditionals
-	// For fish, we'll use a simpler approach with string replace
+	// For fish, we'll use a simpler approach with string replace.
+	// Note: $$ is a literal $ in regexp replacement strings.
 	ifProdRegex := regexp.MustCompile(`\{\{if \.IsProd\}\}(.*?)\{\{end\}\}`)
-	result = ifProdRegex.ReplaceAllString(result, `"(test "$ctx_env" = "production" -o "$ctx_env" = "prod"; and echo '$1')"`)
+	result = ifProdRegex.ReplaceAllString(result, `"(test "$$CTX_CONFIRM" = "true"; and echo '${1}')"`)
 
 	return result
 }
@@ -186,15 +189,21 @@ __ctx_prompt() {
         local color=""
         local reset="\033[0m"
 
-        case "$ctx_env" in
-            production|prod)
-                color="\033[31m"  # Red
-                ;;
-            staging|stage)
-                color="\033[33m"  # Yellow
-                ;;
+        # CTX_ENV_COLOR is resolved by ctx (env_color, else environment default)
+        case "${CTX_ENV_COLOR:-}" in
+            red)     color="\033[31m" ;;
+            green)   color="\033[32m" ;;
+            yellow)  color="\033[33m" ;;
+            blue)    color="\033[34m" ;;
+            magenta) color="\033[35m" ;;
+            cyan)    color="\033[36m" ;;
+            white)   color="\033[37m" ;;
             *)
-                color="\033[32m"  # Green
+                case "$ctx_env" in
+                    production|prod) color="\033[31m" ;;
+                    staging|stage)   color="\033[33m" ;;
+                    *)               color="\033[32m" ;;
+                esac
                 ;;
         esac
 
@@ -288,15 +297,17 @@ __ctx_prompt() {
         local color=""
         local reset="%f"
 
-        case "$ctx_env" in
-            production|prod)
-                color="%F{red}"
-                ;;
-            staging|stage)
-                color="%F{yellow}"
+        # CTX_ENV_COLOR is resolved by ctx (env_color, else environment default)
+        case "${CTX_ENV_COLOR:-}" in
+            red|green|yellow|blue|magenta|cyan|white)
+                color="%F{${CTX_ENV_COLOR}}"
                 ;;
             *)
-                color="%F{green}"
+                case "$ctx_env" in
+                    production|prod) color="%F{red}" ;;
+                    staging|stage)   color="%F{yellow}" ;;
+                    *)               color="%F{green}" ;;
+                esac
                 ;;
         esac
 
@@ -411,13 +422,19 @@ function __ctx_prompt
         set -l ctx_env "$CTX_ENVIRONMENT"
         set -l color
 
-        switch "$ctx_env"
-            case production prod
-                set color (set_color red)
-            case staging stage
-                set color (set_color yellow)
+        # CTX_ENV_COLOR is resolved by ctx (env_color, else environment default)
+        switch "$CTX_ENV_COLOR"
+            case red green yellow blue magenta cyan white
+                set color (set_color $CTX_ENV_COLOR)
             case '*'
-                set color (set_color green)
+                switch "$ctx_env"
+                    case production prod
+                        set color (set_color red)
+                    case staging stage
+                        set color (set_color yellow)
+                    case '*'
+                        set color (set_color green)
+                end
         end
 
         set -l prompt_text "{{.PromptFormat}}"

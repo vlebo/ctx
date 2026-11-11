@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -645,6 +646,8 @@ func (m *Manager) GenerateEnvVars(ctx *ContextConfig) map[string]string {
 	// Context metadata
 	envVars["CTX_CURRENT"] = ctx.Name
 	envVars["CTX_ENVIRONMENT"] = string(ctx.Environment)
+	envVars["CTX_CONFIRM"] = strconv.FormatBool(ctx.RequiresConfirm())
+	envVars["CTX_ENV_COLOR"] = ctx.EnvColorName()
 
 	return envVars
 }
