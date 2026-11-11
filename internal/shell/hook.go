@@ -189,15 +189,21 @@ __ctx_prompt() {
         local color=""
         local reset="\033[0m"
 
-        case "$ctx_env" in
-            production|prod)
-                color="\033[31m"  # Red
-                ;;
-            staging|stage)
-                color="\033[33m"  # Yellow
-                ;;
+        # CTX_ENV_COLOR is resolved by ctx (env_color, else environment default)
+        case "${CTX_ENV_COLOR:-}" in
+            red)     color="\033[31m" ;;
+            green)   color="\033[32m" ;;
+            yellow)  color="\033[33m" ;;
+            blue)    color="\033[34m" ;;
+            magenta) color="\033[35m" ;;
+            cyan)    color="\033[36m" ;;
+            white)   color="\033[37m" ;;
             *)
-                color="\033[32m"  # Green
+                case "$ctx_env" in
+                    production|prod) color="\033[31m" ;;
+                    staging|stage)   color="\033[33m" ;;
+                    *)               color="\033[32m" ;;
+                esac
                 ;;
         esac
 
@@ -291,15 +297,17 @@ __ctx_prompt() {
         local color=""
         local reset="%f"
 
-        case "$ctx_env" in
-            production|prod)
-                color="%F{red}"
-                ;;
-            staging|stage)
-                color="%F{yellow}"
+        # CTX_ENV_COLOR is resolved by ctx (env_color, else environment default)
+        case "${CTX_ENV_COLOR:-}" in
+            red|green|yellow|blue|magenta|cyan|white)
+                color="%F{${CTX_ENV_COLOR}}"
                 ;;
             *)
-                color="%F{green}"
+                case "$ctx_env" in
+                    production|prod) color="%F{red}" ;;
+                    staging|stage)   color="%F{yellow}" ;;
+                    *)               color="%F{green}" ;;
+                esac
                 ;;
         esac
 
@@ -414,13 +422,19 @@ function __ctx_prompt
         set -l ctx_env "$CTX_ENVIRONMENT"
         set -l color
 
-        switch "$ctx_env"
-            case production prod
-                set color (set_color red)
-            case staging stage
-                set color (set_color yellow)
+        # CTX_ENV_COLOR is resolved by ctx (env_color, else environment default)
+        switch "$CTX_ENV_COLOR"
+            case red green yellow blue magenta cyan white
+                set color (set_color $CTX_ENV_COLOR)
             case '*'
-                set color (set_color green)
+                switch "$ctx_env"
+                    case production prod
+                        set color (set_color red)
+                    case staging stage
+                        set color (set_color yellow)
+                    case '*'
+                        set color (set_color green)
+                end
         end
 
         set -l prompt_text "{{.PromptFormat}}"

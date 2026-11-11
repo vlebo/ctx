@@ -345,6 +345,7 @@ func TestManager_GenerateEnvVars(t *testing.T) {
 		"CTX_CURRENT":                 "env-test",
 		"CTX_ENVIRONMENT":             "production",
 		"CTX_CONFIRM":                 "true",
+		"CTX_ENV_COLOR":               "red",
 	}
 
 	for k, v := range expected {

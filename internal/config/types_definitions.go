@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"strings"
 
 	"dario.cat/mergo"
 	"gopkg.in/yaml.v3"
@@ -563,6 +564,27 @@ func (c *ContextConfig) GetExtras() []string {
 // IsProd returns true if the context is for a production environment.
 func (c *ContextConfig) IsProd() bool {
 	return c.Environment.IsProd()
+}
+
+// EnvColorName returns the colour used for this context in listings and the
+// shell prompt: env_color when it is a supported colour, otherwise a default
+// based on the environment name.
+func (c *ContextConfig) EnvColorName() string {
+	switch name := strings.ToLower(c.EnvColor); name {
+	case "red", "yellow", "green", "blue", "cyan", "magenta", "white":
+		return name
+	}
+	switch strings.ToLower(string(c.Environment)) {
+	case "production", "prod":
+		return "red"
+	case "staging", "stage":
+		return "yellow"
+	case "development", "dev":
+		return "green"
+	case "beta":
+		return "cyan"
+	}
+	return "white"
 }
 
 // RequiresConfirm reports whether switching to this context needs confirmation

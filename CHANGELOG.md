@@ -10,6 +10,7 @@
 ### Bug Fixes
 
 - **Prompt Warning Never Shown**: The `{{if .IsProd}}` part of `prompt_format` (the ⚠️ in the default prompt) never appeared in bash, zsh or fish, because the generated shell test always compared an empty string. It now shows for contexts that require confirmation.
+- **Prompt Colour Ignored `env_color`**: The shell prompt tag now uses the context's `env_color`, matching `ctx list` and `ctx show`, instead of always picking red/yellow/green from the environment name. The shell now exports `CTX_ENV_COLOR`.
 - **Per-Shell Current Context**: `ctx`, `ctx list` and the `vpn` commands now read the current context from the shell's `CTX_CURRENT` before the shared state file, so they no longer report a context another terminal switched to.
 - **Kubernetes Switch Failures**: A failed AKS/EKS/GKE credential fetch, or a kubectl context that does not exist, now counts as a failed switch (prompting to continue) instead of printing `✓ Kubernetes context` in the summary.
 
