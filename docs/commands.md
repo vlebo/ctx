@@ -43,7 +43,7 @@ Switch to a context.
 
 ```bash
 ctx use myproject-dev            # Switch to context
-ctx use myproject-prod --confirm # Switch to production (skip confirmation)
+ctx use myproject-prod --confirm # Switch without the confirmation prompt
 ctx use myproject-prod --replace # Switch and deactivate previous context
 ```
 
@@ -51,13 +51,13 @@ ctx use myproject-prod --replace # Switch and deactivate previous context
 
 | Flag | Description |
 |------|-------------|
-| `--confirm` | Skip production confirmation prompt |
+| `--confirm` | Skip the confirmation prompt (production contexts, or any context with `confirm: true`) |
 | `--replace` | Deactivate previous context before switching |
 
 **What happens:**
 
 1. Validates context exists and is not abstract
-2. If production, prompts for confirmation (unless `--confirm`)
+2. If the context requires confirmation (production by default, or set with `confirm`), prompts for it unless `--confirm` is given
 3. Sets environment variables
 4. Connects VPN (if `auto_connect: true`)
 5. Starts tunnels (if `auto_connect: true`)
@@ -268,6 +268,6 @@ Add to your shell config:
 |------|---------|
 | `0` | Success |
 | `1` | General error |
-| `2` | Context not found |
+| `2` | Context not found (including a missing parent in `extends`) |
 | `3` | Abstract context (cannot use) |
-| `4` | Production confirmation declined |
+| `4` | Confirmation declined |

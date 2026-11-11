@@ -58,6 +58,7 @@ func TestGenerateHook_Bash(t *testing.T) {
 		cfg.StateDir + "/current.env",
 		"--export",
 		"CTX_CURRENT",
+		"CTX_ENV_COLOR",
 		"__ctx_prompt",
 	}
 
@@ -88,6 +89,7 @@ func TestGenerateHook_Zsh(t *testing.T) {
 		cfg.StateDir + "/current.env",
 		"--export",
 		"CTX_CURRENT",
+		"CTX_ENV_COLOR",
 		"PROMPT_SUBST",
 	}
 
@@ -118,6 +120,7 @@ func TestGenerateHook_Fish(t *testing.T) {
 		cfg.StateDir + "/current.env",
 		"--export",
 		"CTX_CURRENT",
+		"CTX_ENV_COLOR",
 		"fish_prompt",
 	}
 
@@ -137,5 +140,21 @@ func TestGenerateHook_UnsupportedShell(t *testing.T) {
 	_, err := GenerateHook(ShellType("powershell"), cfg)
 	if err == nil {
 		t.Error("Expected error for unsupported shell type")
+	}
+}
+
+func TestConvertPromptFormat_ConfirmIndicator(t *testing.T) {
+	format := "[ctx: {{.Name}}{{if .IsProd}} ⚠️{{end}}]"
+
+	bash := convertPromptFormatToBash(format)
+	wantBash := `[ctx: ${ctx_name}$([ "${CTX_CONFIRM:-}" = "true" ] && echo ' ⚠️')]`
+	if bash != wantBash {
+		t.Errorf("convertPromptFormatToBash() = %q, want %q", bash, wantBash)
+	}
+
+	fish := convertPromptFormatToFish(format)
+	wantFish := `[ctx: $ctx_name"(test "$CTX_CONFIRM" = "true"; and echo ' ⚠️')"]`
+	if fish != wantFish {
+		t.Errorf("convertPromptFormatToFish() = %q, want %q", fish, wantFish)
 	}
 }

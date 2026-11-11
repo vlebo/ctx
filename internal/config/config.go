@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -224,7 +225,7 @@ func (m *Manager) loadContextWithChain(name string, chain []string) (*ContextCon
 	data, err := os.ReadFile(contextPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("context '%s' not found", name)
+			return nil, &ContextNotFoundError{Name: name}
 		}
 		return nil, fmt.Errorf("failed to read context file: %w", err)
 	}
@@ -310,7 +311,7 @@ func (m *Manager) DeleteContext(name string) error {
 	contextPath := filepath.Join(m.contextsDir, name+".yaml")
 
 	if _, err := os.Stat(contextPath); os.IsNotExist(err) {
-		return fmt.Errorf("context '%s' not found", name)
+		return &ContextNotFoundError{Name: name}
 	}
 
 	if err := os.Remove(contextPath); err != nil {
@@ -645,6 +646,8 @@ func (m *Manager) GenerateEnvVars(ctx *ContextConfig) map[string]string {
 	// Context metadata
 	envVars["CTX_CURRENT"] = ctx.Name
 	envVars["CTX_ENVIRONMENT"] = string(ctx.Environment)
+	envVars["CTX_CONFIRM"] = strconv.FormatBool(ctx.RequiresConfirm())
+	envVars["CTX_ENV_COLOR"] = ctx.EnvColorName()
 
 	return envVars
 }

@@ -423,9 +423,60 @@ test_production_confirmation() {
         source_ctx_env e2e-test-prod
         assert_eq "$CTX_CURRENT" "e2e-test-prod" "Production switch with --confirm works"
         assert_eq "$CTX_ENVIRONMENT" "production" "Production environment is set"
+        assert_eq "$CTX_CONFIRM" "true" "CTX_CONFIRM is true for production"
+        assert_eq "$CTX_ENV_COLOR" "red" "CTX_ENV_COLOR follows env_color"
     else
         log_fail "Production switch with --confirm should work"
     fi
+}
+
+test_confirm_override() {
+    log_section "Test: Confirm Override"
+
+    clear_ctx_env
+
+    # Production context that opts out of confirmation
+    cat > "${CTX_CONTEXTS_DIR}/e2e-test-prod-noconfirm.yaml" << 'EOF'
+name: e2e-test-prod-noconfirm
+description: "E2E Test Production Without Confirmation"
+environment: production
+confirm: false
+EOF
+
+    # Non-production context that opts in to confirmation
+    cat > "${CTX_CONTEXTS_DIR}/e2e-test-stage-confirm.yaml" << 'EOF'
+name: e2e-test-stage-confirm
+description: "E2E Test Staging With Confirmation"
+environment: staging
+confirm: true
+EOF
+
+    log_info "Testing production switch with confirm: false..."
+    if run_cmd ctx use e2e-test-prod-noconfirm < /dev/null; then
+        source_ctx_env e2e-test-prod-noconfirm
+        assert_eq "$CTX_CURRENT" "e2e-test-prod-noconfirm" "confirm: false skips production confirmation"
+        assert_eq "$CTX_CONFIRM" "false" "CTX_CONFIRM is false when confirm: false"
+    else
+        log_fail "Production switch with confirm: false should not require confirmation"
+    fi
+
+    clear_ctx_env
+
+    log_info "Testing staging switch with confirm: true..."
+    if run_cmd ctx use e2e-test-stage-confirm < /dev/null; then
+        log_fail "Staging switch with confirm: true should require confirmation"
+    else
+        log_success "confirm: true requires confirmation on a non-production context"
+    fi
+
+    if run_cmd ctx use e2e-test-stage-confirm --confirm; then
+        source_ctx_env e2e-test-stage-confirm
+        assert_eq "$CTX_CONFIRM" "true" "CTX_CONFIRM is true when confirm: true"
+    else
+        log_fail "Staging switch with confirm: true and --confirm should work"
+    fi
+
+    rm -f "${CTX_CONTEXTS_DIR}/e2e-test-prod-noconfirm.yaml" "${CTX_CONTEXTS_DIR}/e2e-test-stage-confirm.yaml"
 }
 
 test_deactivate() {
@@ -699,6 +750,27 @@ test_invalid_context() {
     fi
 }
 
+test_exit_codes() {
+    log_section "Test: Exit Codes"
+
+    clear_ctx_env
+
+    run_cmd ctx use non-existent-context
+    assert_eq "$?" "2" "Missing context exits 2"
+
+    cat > "${CTX_CONTEXTS_DIR}/e2e-test-abstract-exit.yaml" << 'EOF'
+name: e2e-test-abstract-exit
+environment: development
+abstract: true
+EOF
+    run_cmd ctx use e2e-test-abstract-exit
+    assert_eq "$?" "3" "Abstract context exits 3"
+    rm -f "${CTX_CONTEXTS_DIR}/e2e-test-abstract-exit.yaml"
+
+    echo "no" | run_cmd ctx use e2e-test-prod
+    assert_eq "$?" "4" "Declined confirmation exits 4"
+}
+
 #
 # MAIN
 #
@@ -717,6 +789,7 @@ main() {
     test_basic_commands
     test_context_switching
     test_production_confirmation
+    test_confirm_override
     test_deactivate
     test_logout
     test_env_var_export
@@ -728,6 +801,7 @@ main() {
     test_show_command
     test_aliases
     test_invalid_context
+    test_exit_codes
 
     # Cleanup
     cleanup
