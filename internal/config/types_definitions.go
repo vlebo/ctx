@@ -480,6 +480,7 @@ type ContextConfig struct {
 	Description string            `yaml:"description" mapstructure:"description"`
 	Environment Environment       `yaml:"environment" mapstructure:"environment"`
 	EnvColor    string            `yaml:"env_color,omitempty" mapstructure:"env_color"` // red, yellow, green, blue, cyan, magenta, white
+	Confirm     *bool             `yaml:"confirm,omitempty" mapstructure:"confirm"`     // Require confirmation on switch and show a prompt warning (default: true for production)
 	Cloud       string            `yaml:"cloud,omitempty" mapstructure:"cloud"`         // Custom cloud provider label (e.g., digitalocean, openstack)
 	Tags        []string          `yaml:"tags" mapstructure:"tags"`
 	Tunnels     []TunnelConfig    `yaml:"tunnels,omitempty" mapstructure:"tunnels"`
@@ -562,6 +563,16 @@ func (c *ContextConfig) GetExtras() []string {
 // IsProd returns true if the context is for a production environment.
 func (c *ContextConfig) IsProd() bool {
 	return c.Environment.IsProd()
+}
+
+// RequiresConfirm reports whether switching to this context needs confirmation
+// and whether the prompt should show a warning. An explicit `confirm` setting
+// wins; otherwise production environments require confirmation.
+func (c *ContextConfig) RequiresConfirm() bool {
+	if c.Confirm != nil {
+		return *c.Confirm
+	}
+	return c.IsProd()
 }
 
 // MergeFrom merges another context config into this one.

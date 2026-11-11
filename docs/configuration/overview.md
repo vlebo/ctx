@@ -26,6 +26,9 @@ description: "MyProject Production Environment"
 environment: production
 # Prompt color: red, yellow, green, blue, cyan, magenta, white
 env_color: red
+# Ask "are you sure?" on switch and show the prompt warning
+# (default: true for production/prod, false otherwise)
+confirm: true
 tags: [myproject, production, aws]
 
 # ─────────────────────────────────────────────────────────────
@@ -202,7 +205,7 @@ version: 1
 default_context: ""              # Default context on new shells
 auto_deactivate: true            # Auto-disconnect VPN/tunnels when switching
 shell_integration: true
-prompt_format: "[ctx: {{.Name}}{{if .IsProd}} ⚠️{{end}}]"
+prompt_format: "[ctx: {{.Name}}{{if .IsProd}} ⚠️{{end}}]"  # .IsProd: context requires confirmation (see `confirm`)
 
 # Default deactivate behavior (can be overridden per-context)
 deactivate:

@@ -13,6 +13,7 @@ Complete reference for all context configuration options.
 | `aliases` | list | Alternative names for this context, e.g. `ctx use platform`. Not inherited. A real context name always wins over an alias. |
 | `abstract` | bool | If true, context cannot be used directly |
 | `env_color` | string | Prompt color: `red`, `yellow`, `green`, `blue`, `cyan`, `magenta`, `white` |
+| `confirm` | bool | Ask "are you sure?" when switching to this context, and show the `{{if .IsProd}}` prompt warning (⚠️). Defaults to `true` for `production`/`prod` environments and `false` otherwise. Set `false` to skip it on a production context, or `true` to add it to any context. Inherited via `extends`. |
 | `cloud` | string | Cloud provider label for platforms without native integration (e.g., `digitalocean`, `openstack`, `otc`). Shows in CLOUD column alongside auto-detected providers. Useful for identifying where your Kubernetes cluster is hosted when using non-major cloud providers. |
 | `tags` | []string | Tags for filtering and organization |
 

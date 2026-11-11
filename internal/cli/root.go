@@ -153,7 +153,7 @@ func printCurrentContext(ctx *config.ContextConfig) {
 	fmt.Print("Current context: ")
 	envColor.Print(ctx.Name)
 	fmt.Printf(" (%s)", ctx.Environment)
-	if ctx.IsProd() {
+	if ctx.RequiresConfirm() {
 		color.New(color.FgRed).Print(" ⚠️")
 	}
 	fmt.Println()
