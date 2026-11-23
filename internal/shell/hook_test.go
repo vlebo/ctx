@@ -58,6 +58,7 @@ func TestGenerateHook_Bash(t *testing.T) {
 		cfg.StateDir + "/current.env",
 		"--export",
 		"CTX_CURRENT",
+		"CTX_ENV_COLOR",
 		"__ctx_prompt",
 	}
 
@@ -88,6 +89,7 @@ func TestGenerateHook_Zsh(t *testing.T) {
 		cfg.StateDir + "/current.env",
 		"--export",
 		"CTX_CURRENT",
+		"CTX_ENV_COLOR",
 		"PROMPT_SUBST",
 	}
 
@@ -118,6 +120,7 @@ func TestGenerateHook_Fish(t *testing.T) {
 		cfg.StateDir + "/current.env",
 		"--export",
 		"CTX_CURRENT",
+		"CTX_ENV_COLOR",
 		"fish_prompt",
 	}
 

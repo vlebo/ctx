@@ -277,3 +277,28 @@ func TestContextConfig_MergeFrom_Confirm(t *testing.T) {
 		}
 	})
 }
+
+func TestContextConfig_EnvColorName(t *testing.T) {
+	tests := []struct {
+		name string
+		ctx  *ContextConfig
+		want string
+	}{
+		{"env_color wins over environment", &ContextConfig{Environment: EnvStaging, EnvColor: "green"}, "green"},
+		{"env_color is case-insensitive", &ContextConfig{EnvColor: "Magenta"}, "magenta"},
+		{"unknown env_color falls back to environment", &ContextConfig{Environment: EnvProduction, EnvColor: "pink"}, "red"},
+		{"production default", &ContextConfig{Environment: EnvProduction}, "red"},
+		{"staging default", &ContextConfig{Environment: EnvStaging}, "yellow"},
+		{"development default", &ContextConfig{Environment: EnvDevelopment}, "green"},
+		{"beta default", &ContextConfig{Environment: "beta"}, "cyan"},
+		{"unknown environment default", &ContextConfig{Environment: "other"}, "white"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.ctx.EnvColorName(); got != tt.want {
+				t.Errorf("ContextConfig.EnvColorName() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

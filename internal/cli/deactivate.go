@@ -114,7 +114,7 @@ func runDeactivate(cmd *cobra.Command, args []string) error {
 			"REDIS_HOST", "REDIS_PORT",
 			"MONGODB_HOST", "MONGODB_PORT",
 			// Context metadata
-			"CTX_CURRENT", "CTX_ENVIRONMENT", "CTX_CONFIRM",
+			"CTX_CURRENT", "CTX_ENVIRONMENT", "CTX_CONFIRM", "CTX_ENV_COLOR",
 		}
 		for _, key := range allPossibleVars {
 			varsToUnset[key] = true

@@ -107,41 +107,19 @@ func runRoot(cmd *cobra.Command, args []string) error {
 }
 
 // getEnvColor returns the color for the environment display.
+// The colour is resolved by ContextConfig.EnvColorName so that listings and
+// the shell prompt always agree.
 func getEnvColor(ctx *config.ContextConfig) *color.Color {
-	// Use custom color if specified
-	if ctx.EnvColor != "" {
-		switch strings.ToLower(ctx.EnvColor) {
-		case "red":
-			return color.New(color.FgRed, color.Bold)
-		case "yellow":
-			return color.New(color.FgYellow, color.Bold)
-		case "green":
-			return color.New(color.FgGreen, color.Bold)
-		case "blue":
-			return color.New(color.FgBlue, color.Bold)
-		case "cyan":
-			return color.New(color.FgCyan, color.Bold)
-		case "magenta":
-			return color.New(color.FgMagenta, color.Bold)
-		case "white":
-			return color.New(color.FgWhite, color.Bold)
-		}
+	attrs := map[string]color.Attribute{
+		"red":     color.FgRed,
+		"yellow":  color.FgYellow,
+		"green":   color.FgGreen,
+		"blue":    color.FgBlue,
+		"cyan":    color.FgCyan,
+		"magenta": color.FgMagenta,
+		"white":   color.FgWhite,
 	}
-
-	// Fall back to defaults for common environment names
-	envLower := strings.ToLower(string(ctx.Environment))
-	switch envLower {
-	case "production", "prod":
-		return color.New(color.FgRed, color.Bold)
-	case "staging", "stage":
-		return color.New(color.FgYellow, color.Bold)
-	case "development", "dev":
-		return color.New(color.FgGreen, color.Bold)
-	case "beta":
-		return color.New(color.FgCyan, color.Bold)
-	default:
-		return color.New(color.FgWhite, color.Bold)
-	}
+	return color.New(attrs[ctx.EnvColorName()], color.Bold)
 }
 
 // printCurrentContext displays the current context information.
