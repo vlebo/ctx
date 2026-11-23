@@ -4,7 +4,6 @@
 
 ### Features
 
-- **Context Aliases**: New `aliases` list on a context so it can be referenced by shorter or alternative names (e.g. `ctx use platform`). Aliases work with `use`, `show`, `logout` and `extends`, are shown in `ctx list` and `ctx show`, and are not inherited. A real context name always wins over an alias, and an alias claimed by more than one context is rejected as ambiguous.
 - **Configurable Switch Confirmation**: New `confirm` option on a context. `confirm: false` skips the "are you sure?" prompt and the prompt ⚠️ on a production context; `confirm: true` adds both to any context. When unset, production contexts still require confirmation as before. The shell now exports `CTX_CONFIRM`.
 
 ### Bug Fixes
@@ -12,8 +11,25 @@
 - **Prompt Warning Never Shown**: The `{{if .IsProd}}` part of `prompt_format` (the ⚠️ in the default prompt) never appeared in bash, zsh or fish, because the generated shell test always compared an empty string. It now shows for contexts that require confirmation.
 - **Prompt Colour Ignored `env_color`**: The shell prompt tag now uses the context's `env_color`, matching `ctx list` and `ctx show`, instead of always picking red/yellow/green from the environment name. The shell now exports `CTX_ENV_COLOR`.
 - **Exit Codes**: `ctx use` now exits `2` for a missing context, `3` for an abstract context and `4` when confirmation is declined, as documented. Previously every error exited `1`.
+
+## [0.1.19] - 2026-11-11
+
+### Features
+
+- **Homebrew**: Releases are now published as a Homebrew cask to `vlebo/homebrew-tap`.
+
+## [0.1.18] - 2026-10-27
+
+### Bug Fixes
+
 - **Per-Shell Current Context**: `ctx`, `ctx list` and the `vpn` commands now read the current context from the shell's `CTX_CURRENT` before the shared state file, so they no longer report a context another terminal switched to.
 - **Kubernetes Switch Failures**: A failed AKS/EKS/GKE credential fetch, or a kubectl context that does not exist, now counts as a failed switch (prompting to continue) instead of printing `✓ Kubernetes context` in the summary.
+
+## [0.1.17] - 2026-10-22
+
+### Features
+
+- **Context Aliases**: New `aliases` list on a context so it can be referenced by shorter or alternative names (e.g. `ctx use platform`). Aliases work with `use`, `show`, `logout` and `extends`, are shown in `ctx list` and `ctx show`, and are not inherited. A real context name always wins over an alias, and an alias claimed by more than one context is rejected as ambiguous.
 
 ## [0.1.14] - 2026-04-19
 
