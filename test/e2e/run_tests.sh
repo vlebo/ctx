@@ -750,6 +750,27 @@ test_invalid_context() {
     fi
 }
 
+test_exit_codes() {
+    log_section "Test: Exit Codes"
+
+    clear_ctx_env
+
+    run_cmd ctx use non-existent-context
+    assert_eq "$?" "2" "Missing context exits 2"
+
+    cat > "${CTX_CONTEXTS_DIR}/e2e-test-abstract-exit.yaml" << 'EOF'
+name: e2e-test-abstract-exit
+environment: development
+abstract: true
+EOF
+    run_cmd ctx use e2e-test-abstract-exit
+    assert_eq "$?" "3" "Abstract context exits 3"
+    rm -f "${CTX_CONTEXTS_DIR}/e2e-test-abstract-exit.yaml"
+
+    echo "no" | run_cmd ctx use e2e-test-prod
+    assert_eq "$?" "4" "Declined confirmation exits 4"
+}
+
 #
 # MAIN
 #
@@ -780,6 +801,7 @@ main() {
     test_show_command
     test_aliases
     test_invalid_context
+    test_exit_codes
 
     # Cleanup
     cleanup

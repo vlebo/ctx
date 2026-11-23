@@ -690,3 +690,13 @@ type CloudConfig struct {
 	SendHeartbeat     bool   `yaml:"send_heartbeat" mapstructure:"send_heartbeat"`         // Send heartbeat to cloud
 	HeartbeatInterval int    `yaml:"heartbeat_interval" mapstructure:"heartbeat_interval"` // Heartbeat interval in seconds (default: 30)
 }
+
+// ContextNotFoundError is returned when a context (or a parent it extends)
+// does not exist.
+type ContextNotFoundError struct {
+	Name string
+}
+
+func (e *ContextNotFoundError) Error() string {
+	return fmt.Sprintf("context '%s' not found", e.Name)
+}
