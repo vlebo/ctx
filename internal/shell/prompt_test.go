@@ -46,6 +46,26 @@ func TestFormatPrompt(t *testing.T) {
 			expected: "[ctx: dev-context]",
 		},
 		{
+			name:   "prod indicator hidden when confirm is false",
+			format: "[ctx: {{.Name}}{{if .IsProd}} ⚠️{{end}}]",
+			ctx: &config.ContextConfig{
+				Name:        "prod-context",
+				Environment: config.EnvProduction,
+				Confirm:     boolPtr(false),
+			},
+			expected: "[ctx: prod-context]",
+		},
+		{
+			name:   "prod indicator shown for non-prod when confirm is true",
+			format: "[ctx: {{.Name}}{{if .IsProd}} ⚠️{{end}}]",
+			ctx: &config.ContextConfig{
+				Name:        "shared-dev",
+				Environment: config.EnvDevelopment,
+				Confirm:     boolPtr(true),
+			},
+			expected: "[ctx: shared-dev ⚠️]",
+		},
+		{
 			name:   "with environment",
 			format: "[{{.Name}} ({{.Environment}})]",
 			ctx: &config.ContextConfig{
@@ -113,3 +133,5 @@ func TestGetCurrentContextName(t *testing.T) {
 		t.Errorf("GetCurrentContextName() = %q, want %q", name, "test-context")
 	}
 }
+
+func boolPtr(b bool) *bool { return &b }

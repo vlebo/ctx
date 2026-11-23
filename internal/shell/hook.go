@@ -51,9 +51,11 @@ func convertPromptFormatToBash(format string) string {
 	result = strings.ReplaceAll(result, "{{.Environment}}", "${ctx_env}")
 
 	// Handle {{if .IsProd}}...{{end}} conditionals
-	// Convert to: $([ "$ctx_env" = "production" ] && echo "..." || echo "")
+	// Shown when the context requires confirmation (CTX_CONFIRM=true).
+	// Convert to: $([ "${CTX_CONFIRM:-}" = "true" ] && echo '...')
+	// Note: $$ is a literal $ in regexp replacement strings.
 	ifProdRegex := regexp.MustCompile(`\{\{if \.IsProd\}\}(.*?)\{\{end\}\}`)
-	result = ifProdRegex.ReplaceAllString(result, `$([ "$ctx_env" = "production" -o "$ctx_env" = "prod" ] && echo '$1')`)
+	result = ifProdRegex.ReplaceAllString(result, `$$([ "$${CTX_CONFIRM:-}" = "true" ] && echo '${1}')`)
 
 	return result
 }
@@ -67,9 +69,10 @@ func convertPromptFormatToFish(format string) string {
 	result = strings.ReplaceAll(result, "{{.Environment}}", "$ctx_env")
 
 	// Handle {{if .IsProd}}...{{end}} conditionals
-	// For fish, we'll use a simpler approach with string replace
+	// For fish, we'll use a simpler approach with string replace.
+	// Note: $$ is a literal $ in regexp replacement strings.
 	ifProdRegex := regexp.MustCompile(`\{\{if \.IsProd\}\}(.*?)\{\{end\}\}`)
-	result = ifProdRegex.ReplaceAllString(result, `"(test "$ctx_env" = "production" -o "$ctx_env" = "prod"; and echo '$1')"`)
+	result = ifProdRegex.ReplaceAllString(result, `"(test "$$CTX_CONFIRM" = "true"; and echo '${1}')"`)
 
 	return result
 }

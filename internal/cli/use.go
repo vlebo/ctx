@@ -34,13 +34,14 @@ func newUseCmd() *cobra.Command {
 		Long: `Switch to a specified context. This will update environment variables,
 switch cloud provider profiles, and configure orchestration tools.
 
-For production environments, the --confirm flag is required, or you will be
-prompted for confirmation.`,
+For production environments (or any context with confirm: true), the --confirm
+flag is required, or you will be prompted for confirmation. Set confirm: false
+on a context to skip this.`,
 		Args: cobra.ExactArgs(1),
 		RunE: runUse,
 	}
 
-	cmd.Flags().BoolVar(&confirmFlag, "confirm", false, "Confirm switching to production environment")
+	cmd.Flags().BoolVar(&confirmFlag, "confirm", false, "Confirm switching to a context that requires confirmation")
 	cmd.Flags().BoolVar(&exportFlag, "export", false, "Output environment variables for shell eval (used by shell hook)")
 	cmd.Flags().BoolVar(&replaceFlag, "replace", false, "Deactivate previous context (disconnect VPN, stop tunnels) before switching")
 
@@ -100,10 +101,10 @@ func runUse(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	// Check if production and require confirmation
-	if ctx.IsProd() && !confirmFlag {
+	// Check if the context requires confirmation
+	if ctx.RequiresConfirm() && !confirmFlag {
 		if !confirmProductionSwitch(ctx) {
-			return fmt.Errorf("aborted: production switch not confirmed")
+			return fmt.Errorf("aborted: switch to %s not confirmed", ctx.Name)
 		}
 	}
 
@@ -119,10 +120,14 @@ func runUse(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-// confirmProductionSwitch prompts the user to confirm switching to a production context.
+// confirmProductionSwitch prompts the user to confirm switching to a context that requires confirmation.
 func confirmProductionSwitch(ctx *config.ContextConfig) bool {
 	warning := color.New(color.FgRed, color.Bold)
-	warning.Printf("⚠️  Switching to PRODUCTION environment: %s\n", ctx.Name)
+	if ctx.Environment != "" {
+		warning.Printf("⚠️  Switching to %s (%s)\n", ctx.Name, strings.ToUpper(string(ctx.Environment)))
+	} else {
+		warning.Printf("⚠️  Switching to %s\n", ctx.Name)
+	}
 	fmt.Print("   Type 'yes' to confirm: ")
 
 	reader := bufio.NewReader(os.Stdin)

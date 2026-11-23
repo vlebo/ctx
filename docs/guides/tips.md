@@ -4,7 +4,7 @@ Practical advice for getting the most out of ctx.
 
 ## Production Safety
 
-Contexts with `environment: production` or `environment: prod`:
+Contexts that require confirmation:
 
 - Display a warning indicator in prompts
 - Require confirmation before switching (use `--confirm` to skip)
@@ -12,8 +12,24 @@ Contexts with `environment: production` or `environment: prod`:
 
 ```bash
 ctx use acme-prod
-# ⚠️  Switching to PRODUCTION environment
-# Type 'yes' to confirm:
+# ⚠️  Switching to acme-prod (PRODUCTION)
+#    Type 'yes' to confirm:
+```
+
+By default this applies to `environment: production` and `environment: prod`. Use `confirm` to change it per context (it is inherited through `extends`):
+
+```yaml
+# A production context you switch to often, without the prompt or warning
+name: acme-prod-readonly
+environment: production
+confirm: false
+```
+
+```yaml
+# A shared staging context that still deserves a warning
+name: acme-staging-shared
+environment: staging
+confirm: true
 ```
 
 ## Per-Shell Isolation

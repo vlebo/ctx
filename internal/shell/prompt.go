@@ -28,7 +28,7 @@ func FormatPrompt(format string, ctx *config.ContextConfig) (string, error) {
 	data := PromptData{
 		Name:        ctx.Name,
 		Environment: string(ctx.Environment),
-		IsProd:      ctx.IsProd(),
+		IsProd:      ctx.RequiresConfirm(),
 	}
 
 	tmpl, err := template.New("prompt").Parse(format)

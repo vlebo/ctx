@@ -234,3 +234,46 @@ func TestContextConfig_GetExtras(t *testing.T) {
 		})
 	}
 }
+
+func TestContextConfig_RequiresConfirm(t *testing.T) {
+	yes, no := true, false
+	tests := []struct {
+		name string
+		ctx  *ContextConfig
+		want bool
+	}{
+		{"production defaults to true", &ContextConfig{Environment: EnvProduction}, true},
+		{"prod alias defaults to true", &ContextConfig{Environment: "prod"}, true},
+		{"staging defaults to false", &ContextConfig{Environment: EnvStaging}, false},
+		{"production with confirm false", &ContextConfig{Environment: EnvProduction, Confirm: &no}, false},
+		{"staging with confirm true", &ContextConfig{Environment: EnvStaging, Confirm: &yes}, true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.ctx.RequiresConfirm(); got != tt.want {
+				t.Errorf("ContextConfig.RequiresConfirm() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestContextConfig_MergeFrom_Confirm(t *testing.T) {
+	yes, no := true, false
+
+	t.Run("child inherits parent confirm", func(t *testing.T) {
+		child := &ContextConfig{Name: "child", Environment: EnvStaging}
+		child.MergeFrom(&ContextConfig{Name: "base", Confirm: &yes})
+		if !child.RequiresConfirm() {
+			t.Error("expected child to inherit confirm: true from parent")
+		}
+	})
+
+	t.Run("child confirm false overrides parent true", func(t *testing.T) {
+		child := &ContextConfig{Name: "child", Environment: EnvProduction, Confirm: &no}
+		child.MergeFrom(&ContextConfig{Name: "base", Confirm: &yes})
+		if child.RequiresConfirm() {
+			t.Error("expected child confirm: false to override parent confirm: true")
+		}
+	})
+}
